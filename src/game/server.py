@@ -3,7 +3,7 @@ from flask_socketio import SocketIO, emit
 from flask_cors import CORS
 import os
 
-app = Flask(__name__, static_folder='../../static', template_folder='../../templates')
+app = Flask(__name__, static_folder='../static', template_folder='../static')
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-secret-key')
 CORS(app, resources={r"/*": {"origins": "*"}})
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
@@ -12,11 +12,11 @@ players = {}
 
 @app.route('/')
 def index():
-    return send_from_directory('static', 'index.html')
+    return send_from_directory(app.static_folder, 'index.html')
 
 @app.route('/<path:path>')
 def serve_file(path):
-    return send_from_directory('static', path)
+    return send_from_directory(app.static_folder, path)
 
 @socketio.on('connect')
 def handle_connect():
@@ -64,7 +64,7 @@ def handle_player_move(position):
         }, broadcast=True)
 
 if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 8080))
+    port = int(os.environ.get('PORT', 10000))
     debug = os.environ.get('FLASK_ENV') == 'development'
     print(f"Starting server on http://0.0.0.0:{port}")
     socketio.run(app, host='0.0.0.0', port=port, debug=debug, allow_unsafe_werkzeug=True)
