@@ -28,6 +28,68 @@
             padding: 5px;
             z-index: 1000;
         }
+        #debugPanel {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            color: white;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 15px;
+            border-radius: 10px;
+            z-index: 1000;
+            min-width: 250px;
+            font-family: Arial, sans-serif;
+        }
+        .debug-info {
+            margin-bottom: 15px;
+            padding: 10px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 5px;
+        }
+        .debug-info p {
+            margin: 5px 0;
+            font-size: 14px;
+        }
+        .debug-info strong {
+            color: #fff;
+        }
+        .debug-control {
+            margin: 10px 0;
+        }
+        .debug-control label {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 5px;
+        }
+        .debug-control label span {
+            min-width: 50px;
+            text-align: right;
+        }
+        .debug-control input[type="range"] {
+            width: 100%;
+            background: #444;
+            height: 8px;
+            border-radius: 4px;
+            outline: none;
+            -webkit-appearance: none;
+            appearance: none;
+        }
+        .debug-control input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 16px;
+            height: 16px;
+            background: white;
+            border-radius: 50%;
+            cursor: pointer;
+        }
+        .debug-control input[type="number"] {
+            width: 60px;
+            background: #333;
+            color: white;
+            border: 1px solid #666;
+            padding: 2px 5px;
+        }
         .hidden { display: none !important; }
         input {
             padding: 8px;
@@ -63,6 +125,31 @@
         </div>
     </div>
     <div id="debug">Connection status: Disconnected</div>
+    <div id="debugPanel" class="hidden">
+        <h3>Debug Controls</h3>
+        <div class="debug-info">
+            <p><strong>Controls:</strong></p>
+            <p>WASD - Move</p>
+            <p>Space - Jump</p>
+        </div>
+        <div class="debug-control">
+            <label for="moveSpeed">Move Speed: <span id="moveSpeedValue">0.1</span></label>
+            <input type="range" id="moveSpeed" min="0.1" max="1.0" step="0.1" value="0.1">
+        </div>
+        <div class="debug-control">
+            <label for="jumpForce">Jump Force: <span id="jumpForceValue">0.3</span></label>
+            <input type="range" id="jumpForce" min="0.1" max="0.5" step="0.1" value="0.3">
+        </div>
+        <div class="debug-control">
+            <label for="gravity">Gravity: <span id="gravityValue">-0.015</span></label>
+            <input type="range" id="gravity" min="-0.05" max="-0.005" step="0.005" value="-0.015">
+        </div>
+        <div id="playerInfo">
+            <h4>Player Info</h4>
+            <p>Position: <span id="playerPosition">x: 0, y: 0, z: 0</span></p>
+            <p>Is Jumping: <span id="playerJumping">false</span></p>
+        </div>
+    </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
@@ -80,10 +167,39 @@
             }
         }
 
+        function selectCharacter(type) {
+            document.getElementById('ui').classList.add('hidden');
+            document.getElementById('debugPanel').classList.remove('hidden');
+            window.playerType = type;
+            socket.emit('playerSelect', {
+                name: window.playerName,
+                type: type
+            });
+        }
+
         document.getElementById('playerName').addEventListener('keypress', function(e) {
             if (e.key === 'Enter') {
                 submitName();
             }
+        });
+
+        // Debug panel controls
+        document.getElementById('moveSpeed').addEventListener('input', function(e) {
+            const value = parseFloat(e.target.value);
+            document.getElementById('moveSpeedValue').textContent = value;
+            window.updateGameSettings({ moveSpeed: value });
+        });
+
+        document.getElementById('jumpForce').addEventListener('input', function(e) {
+            const value = parseFloat(e.target.value);
+            document.getElementById('jumpForceValue').textContent = value;
+            window.updateGameSettings({ jumpForce: value });
+        });
+
+        document.getElementById('gravity').addEventListener('input', function(e) {
+            const value = parseFloat(e.target.value);
+            document.getElementById('gravityValue').textContent = value;
+            window.updateGameSettings({ gravity: value });
         });
 
         init();
