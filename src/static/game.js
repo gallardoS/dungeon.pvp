@@ -73,7 +73,13 @@ function createPlayerName(name) {
 }
 
 function initSocket() {
-    socket = io();
+    socket = io({
+        transports: ['websocket'],
+        upgrade: false,
+        reconnection: true,
+        reconnectionDelay: 1000,
+        reconnectionDelayMax: 5000
+    });
 
     socket.on('connect', () => {
         document.getElementById('debug').textContent = 'Connected';
@@ -97,7 +103,9 @@ function initSocket() {
                     mesh: mesh,
                     nameSprite: nameSprite,
                     type: player.type,
-                    name: player.name
+                    name: player.name,
+                    lastUpdate: Date.now(),
+                    targetPosition: { ...player.position }
                 };
                 
                 if (player.id === socket.id) {
@@ -107,6 +115,10 @@ function initSocket() {
                         document.getElementById('adminPanel').classList.remove('hidden');
                     }
                 }
+            } else if (player.id !== socket.id) {
+                const existingPlayer = players[player.id];
+                existingPlayer.targetPosition = { ...player.position };
+                existingPlayer.lastUpdate = Date.now();
             }
         });
 
@@ -126,7 +138,8 @@ function initSocket() {
     socket.on('playerMoved', data => {
         if (players[data.id] && data.id !== socket.id) {
             const player = players[data.id];
-            player.mesh.position.set(data.position.x, data.position.y, data.position.z);
+            player.targetPosition = { ...data.position };
+            player.lastUpdate = Date.now();
         }
     });
 
@@ -174,38 +187,41 @@ function handleKeyUp(event) {
 function updateMovement() {
     if (!playerMesh) return;
 
-    const oldPosition = playerMesh.position.clone();
     let moved = false;
+    const movement = { x: 0, z: 0 };
 
-    if (keys.w) {
-        playerMesh.position.z -= moveSpeed;
-        moved = true;
-    }
-    if (keys.s) {
-        playerMesh.position.z += moveSpeed;
-        moved = true;
-    }
-    if (keys.a) {
-        playerMesh.position.x -= moveSpeed;
-        moved = true;
-    }
-    if (keys.d) {
-        playerMesh.position.x += moveSpeed;
-        moved = true;
-    }
-    if (keys[' '] && !isJumping && playerMesh.position.y <= floorY) {
+    if (keys.w) movement.z -= moveSpeed;
+    if (keys.s) movement.z += moveSpeed;
+    if (keys.a) movement.x -= moveSpeed;
+    if (keys.d) movement.x += moveSpeed;
+    if (keys[' '] && !isJumping) {
         velocity = jumpForce;
         isJumping = true;
         moved = true;
     }
 
-    if (moved && !oldPosition.equals(playerMesh.position)) {
-        socket.emit('playerMove', {
+    if (movement.x !== 0 || movement.z !== 0) {
+        playerMesh.position.x = Math.max(Math.min(playerMesh.position.x + movement.x, 10), -10);
+        playerMesh.position.z = Math.max(Math.min(playerMesh.position.z + movement.z, 10), -10);
+        moved = true;
+    }
+
+    if (moved) {
+        socket.volatile.emit('playerMove', {
             x: playerMesh.position.x,
             y: playerMesh.position.y,
             z: playerMesh.position.z
         });
     }
+
+    Object.values(players).forEach(player => {
+        if (player.mesh !== playerMesh && player.targetPosition) {
+            const t = Math.min((Date.now() - player.lastUpdate) / 100, 1);
+            player.mesh.position.x += (player.targetPosition.x - player.mesh.position.x) * t;
+            player.mesh.position.y += (player.targetPosition.y - player.mesh.position.y) * t;
+            player.mesh.position.z += (player.targetPosition.z - player.mesh.position.z) * t;
+        }
+    });
 }
 
 function applyPhysics() {
