@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Dungeon PvP</title>
+    <style>
+        body { margin: 0; overflow: hidden; }
+        #ui {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            color: white;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 20px;
+            border-radius: 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            z-index: 1000;
+        }
+        #debug {
+            position: fixed;
+            bottom: 10px;
+            left: 10px;
+            color: white;
+            background: rgba(0, 0, 0, 0.5);
+            padding: 5px;
+            z-index: 1000;
+        }
+        .hidden { display: none !important; }
+        input {
+            padding: 8px;
+            margin: 5px;
+            border-radius: 4px;
+            border: 1px solid #666;
+            background: #333;
+            color: white;
+        }
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+            border-radius: 4px;
+            border: none;
+            background: #444;
+            color: white;
+            cursor: pointer;
+        }
+        button:hover { background: #555; }
+    </style>
+</head>
+<body>
+    <div id="ui">
+        <div id="nameInput">
+            <h2>Enter your name</h2>
+            <input type="text" id="playerName" placeholder="3-15 characters" minlength="3" maxlength="15">
+            <button onclick="submitName()">Continue</button>
+        </div>
+        <div id="characterSelect" class="hidden">
+            <h2>Select your character</h2>
+            <button onclick="selectCharacter('warrior')">Warrior</button>
+            <button onclick="selectCharacter('mage')">Mage</button>
+        </div>
+    </div>
+    <div id="debug">Connection status: Disconnected</div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    <script src="game.js"></script>
+    <script>
+        function submitName() {
+            const nameInput = document.getElementById('playerName');
+            const name = nameInput.value.trim();
+            if (name.length >= 3 && name.length <= 15) {
+                document.getElementById('nameInput').classList.add('hidden');
+                document.getElementById('characterSelect').classList.remove('hidden');
+                window.playerName = name;
+            } else {
+                alert('Name must be between 3 and 15 characters');
+            }
+        }
+
+        document.getElementById('playerName').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                submitName();
+            }
+        });
+
+        init();
+        initSocket();
+    </script>
+</body>
+</html>

@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: dungeon-pvp
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: python src/game/server.py
+    envVars:
+      - key: FLASK_ENV
+        value: production
+      - key: SECRET_KEY
+        generateValue: true
+      - key: PYTHON_VERSION
+        value: 3.9.0
+    healthCheckPath: /
+    autoDeploy: false
