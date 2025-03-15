@@ -98,16 +98,17 @@ function initSocket() {
                     mesh: mesh,
                     nameSprite: nameSprite,
                     type: player.type,
-                    velocity: 0,
-                    isJumping: false
+                    name: player.name
                 };
                 
                 if (player.id === socket.id) {
                     playerMesh = mesh;
+                    // Mostrar panel de admin si el jugador es swami
+                    if (player.name === 'swami') {
+                        document.getElementById('adminPanel').classList.remove('hidden');
+                        updatePlayerList();
+                    }
                 }
-            } else {
-                // Actualizar posición de jugadores existentes
-                players[player.id].mesh.position.set(player.position.x, player.position.y, player.position.z);
             }
         });
 
@@ -121,19 +122,40 @@ function initSocket() {
 
     socket.on('playerMoved', data => {
         if (players[data.id] && data.id !== socket.id) {
-            // Actualizar posición del jugador remoto
             const player = players[data.id];
             player.mesh.position.set(data.position.x, data.position.y, data.position.z);
-            
-            // Aplicar física al jugador remoto
-            if (data.position.y > floorY) {
-                player.isJumping = true;
-            } else {
-                player.isJumping = false;
-                player.velocity = 0;
-            }
         }
     });
+
+    socket.on('playerList', playerList => {
+        const playerListElement = document.getElementById('connectedPlayers');
+        playerListElement.innerHTML = '';
+        
+        playerList.forEach(player => {
+            if (player.id !== socket.id) {
+                const li = document.createElement('li');
+                li.className = 'player-item';
+                li.innerHTML = `
+                    <span>${player.name} (${player.type})</span>
+                    <button class="kick-button" onclick="kickPlayer('${player.id}')">Kick</button>
+                `;
+                playerListElement.appendChild(li);
+            }
+        });
+    });
+
+    socket.on('kicked', () => {
+        alert('You have been kicked from the server');
+        window.location.reload();
+    });
+}
+
+function updatePlayerList() {
+    socket.emit('getPlayers');
+}
+
+function kickPlayer(playerId) {
+    socket.emit('kickPlayer', { id: playerId });
 }
 
 function handleKeyDown(event) {
@@ -205,21 +227,6 @@ function applyPhysics() {
             });
         }
     }
-
-    // Aplicar física a los jugadores remotos
-    Object.entries(players).forEach(([id, player]) => {
-        if (id !== socket.id && player.mesh) {
-            if (player.mesh.position.y > floorY) {
-                player.velocity = (player.velocity || 0) + gravity;
-                player.mesh.position.y += player.velocity;
-                if (player.mesh.position.y < floorY) {
-                    player.mesh.position.y = floorY;
-                    player.velocity = 0;
-                    player.isJumping = false;
-                }
-            }
-        }
-    });
 }
 
 function onWindowResize() {

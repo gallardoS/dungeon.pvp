@@ -71,6 +71,19 @@ def handle_player_move(position):
             'position': players[request.sid]['position']
         }, broadcast=True)
 
+@socketio.on('getPlayers')
+def handle_get_players():
+    if request.sid in players and players[request.sid]['name'] == 'swami':
+        emit('playerList', [{'id': id, **data} for id, data in players.items()])
+
+@socketio.on('kickPlayer')
+def handle_kick_player(data):
+    player_id = data.get('id')
+    if request.sid in players and players[request.sid]['name'] == 'swami' and player_id in players:
+        socketio.emit('kicked', room=player_id)
+        del players[player_id]
+        emit('players', [{'id': id, **data} for id, data in players.items()], broadcast=True)
+
 if __name__ == '__main__':
     print(f"Static folder path: {app.static_folder}")
     print(f"Files in static folder: {os.listdir(app.static_folder)}")
