@@ -7,6 +7,10 @@ let gravity = -0.015;
 let moveSpeed = 0.1;
 let jumpForce = 0.3;
 const floorY = -4;
+let lastMouseX = 0;
+let playerRotation = 0;
+let mouseSensitivity = 0.002;
+let isRotating = false;
 
 const keys = {
     w: false,
@@ -38,8 +42,42 @@ function init() {
     window.addEventListener('resize', onWindowResize, false);
     document.addEventListener('keydown', handleKeyDown);
     document.addEventListener('keyup', handleKeyUp);
+    
+    // Eventos para controlar la rotación con el ratón sin bloquearlo
+    renderer.domElement.addEventListener('mousedown', handleMouseDown);
+    document.addEventListener('mouseup', handleMouseUp);
+    document.addEventListener('mousemove', handleMouseMove);
+    
+    // Prevenir el menú contextual al hacer clic derecho
+    renderer.domElement.addEventListener('contextmenu', function(event) {
+        event.preventDefault();
+    });
 
     animate();
+}
+
+function handleMouseDown(event) {
+    // Solo activar la rotación con el botón derecho (event.button === 2)
+    if (event.button === 2) {
+        isRotating = true;
+        lastMouseX = event.clientX;
+    }
+}
+
+function handleMouseUp(event) {
+    // Solo desactivar la rotación si se suelta el botón derecho
+    if (event.button === 2) {
+        isRotating = false;
+    }
+}
+
+function handleMouseMove(event) {
+    if (isRotating) {
+        // Calcular el movimiento horizontal del ratón
+        const deltaX = event.clientX - lastMouseX;
+        playerRotation -= deltaX * mouseSensitivity;
+        lastMouseX = event.clientX;
+    }
 }
 
 function createCharacterMesh(type) {
@@ -147,6 +185,43 @@ function initSocket() {
         alert('You have been kicked from the server');
         window.location.reload();
     });
+
+    socket.on('chatMessage', data => {
+        addChatMessage(data.sender, data.message, data.timestamp);
+    });
+}
+
+function addChatMessage(sender, message, timestamp) {
+    const chatMessages = document.getElementById('chatMessages');
+    const messageElement = document.createElement('div');
+    messageElement.className = 'chat-message';
+    
+    const time = new Date(timestamp);
+    const timeString = `${time.getHours().toString().padStart(2, '0')}:${time.getMinutes().toString().padStart(2, '0')}`;
+    
+    messageElement.innerHTML = `
+        <span class="sender">${sender}:</span>
+        ${message}
+        <span class="timestamp">${timeString}</span>
+    `;
+    
+    chatMessages.appendChild(messageElement);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+    
+    // Limitar el número de mensajes (mantener los últimos 50)
+    while (chatMessages.children.length > 50) {
+        chatMessages.removeChild(chatMessages.firstChild);
+    }
+}
+
+function sendChatMessage() {
+    const messageInput = document.getElementById('messageInput');
+    const message = messageInput.value.trim();
+    
+    if (message && socket) {
+        socket.emit('chatMessage', { message });
+        messageInput.value = '';
+    }
 }
 
 function updateAdminPlayerList(playerList) {
@@ -189,11 +264,36 @@ function updateMovement() {
 
     let moved = false;
     const movement = { x: 0, z: 0 };
+    
+    // Crear un vector de dirección basado en la rotación del personaje
+    const direction = new THREE.Vector3();
+    
+    // Movimiento relativo a la dirección del personaje
+    if (keys.w) {
+        direction.z = -1;
+    }
+    if (keys.s) {
+        direction.z = 1;
+    }
+    if (keys.a) {
+        direction.x = -1;
+    }
+    if (keys.d) {
+        direction.x = 1;
+    }
+    
+    // Normalizar el vector si se mueve en diagonal
+    if (direction.length() > 0) {
+        direction.normalize();
+        
+        // Aplicar la rotación del personaje al movimiento
+        direction.applyAxisAngle(new THREE.Vector3(0, 1, 0), playerRotation);
+        
+        movement.x = direction.x * moveSpeed;
+        movement.z = direction.z * moveSpeed;
+        moved = true;
+    }
 
-    if (keys.w) movement.z -= moveSpeed;
-    if (keys.s) movement.z += moveSpeed;
-    if (keys.a) movement.x -= moveSpeed;
-    if (keys.d) movement.x += moveSpeed;
     if (keys[' '] && !isJumping) {
         velocity = jumpForce;
         isJumping = true;
@@ -205,6 +305,9 @@ function updateMovement() {
         playerMesh.position.z = Math.max(Math.min(playerMesh.position.z + movement.z, 10), -10);
         moved = true;
     }
+    
+    // Actualizar la rotación del personaje
+    playerMesh.rotation.y = playerRotation;
 
     if (moved) {
         socket.volatile.emit('playerMove', {
@@ -255,15 +358,26 @@ function animate() {
     applyPhysics();
     
     if (playerMesh) {
-        camera.position.x = playerMesh.position.x;
-        camera.position.y = playerMesh.position.y + 3;
-        camera.position.z = playerMesh.position.z + 5;
-        camera.lookAt(playerMesh.position);
-
+        // Posicionar la cámara detrás del personaje basado en su rotación
+        const cameraOffset = new THREE.Vector3(0, 3, 5);
+        cameraOffset.applyAxisAngle(new THREE.Vector3(0, 1, 0), playerRotation);
+        
+        camera.position.x = playerMesh.position.x + cameraOffset.x;
+        camera.position.y = playerMesh.position.y + cameraOffset.y;
+        camera.position.z = playerMesh.position.z + cameraOffset.z;
+        
+        // Hacer que la cámara mire al personaje
+        camera.lookAt(
+            playerMesh.position.x,
+            playerMesh.position.y + 1, // Mirar un poco por encima del centro del jugador
+            playerMesh.position.z
+        );
        
         document.getElementById('playerPosition').textContent = 
             `x: ${playerMesh.position.x.toFixed(2)}, y: ${playerMesh.position.y.toFixed(2)}, z: ${playerMesh.position.z.toFixed(2)}`;
         document.getElementById('playerJumping').textContent = isJumping;
+        document.getElementById('playerRotation').textContent = 
+            `${(playerRotation * 180 / Math.PI).toFixed(2)}°`;
     }
 
     Object.values(players).forEach(player => {
@@ -279,6 +393,8 @@ function updateGameSettings(settings) {
     if (settings.moveSpeed !== undefined) moveSpeed = settings.moveSpeed;
     if (settings.jumpForce !== undefined) jumpForce = settings.jumpForce;
     if (settings.gravity !== undefined) gravity = settings.gravity;
+    if (settings.mouseSensitivity !== undefined) mouseSensitivity = settings.mouseSensitivity;
 }
 
 window.updateGameSettings = updateGameSettings;
+window.sendChatMessage = sendChatMessage;

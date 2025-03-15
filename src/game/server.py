@@ -2,6 +2,7 @@ from flask import Flask, render_template, send_from_directory, request
 from flask_socketio import SocketIO, emit
 from flask_cors import CORS
 import os
+import time
 
 app = Flask(__name__)
 app.static_folder = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'static'))
@@ -65,6 +66,18 @@ def handle_kick_player(data):
         socketio.emit('kicked', room=player_id)
         del players[player_id]
         emit('players', [{'id': id, **data} for id, data in players.items()], broadcast=True)
+
+@socketio.on('chatMessage')
+def handle_chat_message(data):
+    if request.sid in players:
+        sender_name = players[request.sid]['name']
+        message = data.get('message', '').strip()
+        if message and len(message) <= 200:  # Limitar longitud del mensaje
+            emit('chatMessage', {
+                'sender': sender_name,
+                'message': message,
+                'timestamp': int(time.time() * 1000)
+            }, broadcast=True)
 
 if __name__ == '__main__':
     print(f"Static folder path: {app.static_folder}")
