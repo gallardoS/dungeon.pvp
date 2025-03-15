@@ -8,7 +8,6 @@ let moveSpeed = 0.1;
 let jumpForce = 0.3;
 const floorY = -4;
 
-// Objeto para mantener el estado de las teclas
 const keys = {
     w: false,
     s: false,
@@ -47,7 +46,7 @@ function createCharacterMesh(type) {
     const geometry = type === 'warrior' ? 
         new THREE.BoxGeometry(1, 2, 1) : 
         new THREE.ConeGeometry(0.5, 2, 32);
-    geometry.translate(0, 1, 0); // Mover el origen a la base del personaje
+    geometry.translate(0, 1, 0); 
     const material = new THREE.MeshBasicMaterial({ color: 0xffffff });
     const mesh = new THREE.Mesh(geometry, material);
     mesh.position.y = floorY;
@@ -67,7 +66,7 @@ function createPlayerName(name) {
     const texture = new THREE.CanvasTexture(canvas);
     const material = new THREE.SpriteMaterial({ map: texture });
     const sprite = new THREE.Sprite(material);
-    sprite.position.y = 3; // Ajustando la altura del nombre para que esté sobre el personaje
+    sprite.position.y = 3; 
     sprite.scale.set(2, 0.5, 1);
     
     return sprite;
@@ -103,10 +102,9 @@ function initSocket() {
                 
                 if (player.id === socket.id) {
                     playerMesh = mesh;
-                    // Mostrar panel de admin si el jugador es swami
+                
                     if (player.name === 'swami') {
                         document.getElementById('adminPanel').classList.remove('hidden');
-                        updatePlayerList();
                     }
                 }
             }
@@ -118,6 +116,11 @@ function initSocket() {
                 delete players[id];
             }
         });
+
+      
+        if (playerMesh && players[socket.id] && players[socket.id].name === 'swami') {
+            updateAdminPlayerList(playerList);
+        }
     });
 
     socket.on('playerMoved', data => {
@@ -127,31 +130,27 @@ function initSocket() {
         }
     });
 
-    socket.on('playerList', playerList => {
-        const playerListElement = document.getElementById('connectedPlayers');
-        playerListElement.innerHTML = '';
-        
-        playerList.forEach(player => {
-            if (player.id !== socket.id) {
-                const li = document.createElement('li');
-                li.className = 'player-item';
-                li.innerHTML = `
-                    <span>${player.name} (${player.type})</span>
-                    <button class="kick-button" onclick="kickPlayer('${player.id}')">Kick</button>
-                `;
-                playerListElement.appendChild(li);
-            }
-        });
-    });
-
     socket.on('kicked', () => {
         alert('You have been kicked from the server');
         window.location.reload();
     });
 }
 
-function updatePlayerList() {
-    socket.emit('getPlayers');
+function updateAdminPlayerList(playerList) {
+    const playerListElement = document.getElementById('connectedPlayers');
+    playerListElement.innerHTML = '';
+    
+    playerList.forEach(player => {
+        if (player.id !== socket.id) {
+            const li = document.createElement('li');
+            li.className = 'player-item';
+            li.innerHTML = `
+                <span>${player.name} (${player.type})</span>
+                <button class="kick-button" onclick="kickPlayer('${player.id}')">Kick</button>
+            `;
+            playerListElement.appendChild(li);
+        }
+    });
 }
 
 function kickPlayer(playerId) {
@@ -210,7 +209,6 @@ function updateMovement() {
 }
 
 function applyPhysics() {
-    // Aplicar física al jugador local
     if (playerMesh) {
         if (playerMesh.position.y > floorY) {
             velocity += gravity;
@@ -246,7 +244,7 @@ function animate() {
         camera.position.z = playerMesh.position.z + 5;
         camera.lookAt(playerMesh.position);
 
-        // Update debug panel with player info
+       
         document.getElementById('playerPosition').textContent = 
             `x: ${playerMesh.position.x.toFixed(2)}, y: ${playerMesh.position.y.toFixed(2)}, z: ${playerMesh.position.z.toFixed(2)}`;
         document.getElementById('playerJumping').textContent = isJumping;
@@ -261,12 +259,10 @@ function animate() {
     renderer.render(scene, camera);
 }
 
-// Add function to update game settings from debug panel
 function updateGameSettings(settings) {
     if (settings.moveSpeed !== undefined) moveSpeed = settings.moveSpeed;
     if (settings.jumpForce !== undefined) jumpForce = settings.jumpForce;
     if (settings.gravity !== undefined) gravity = settings.gravity;
 }
 
-// Make updateGameSettings available globally
 window.updateGameSettings = updateGameSettings;

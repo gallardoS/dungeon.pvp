@@ -34,47 +34,29 @@ def handle_connect():
 def handle_disconnect():
     if request.sid in players:
         del players[request.sid]
-        emit('players', list(players.values()), broadcast=True)
+        emit('players', [{'id': id, **data} for id, data in players.items()], broadcast=True)
 
 @socketio.on('playerSelect')
 def handle_player_select(data):
-    if not isinstance(data, dict) or 'name' not in data or 'type' not in data:
-        return
-    
-    name = str(data['name']).strip()
-    player_type = str(data['type']).strip()
+    name = data.get('name', '')
+    player_type = data.get('type', '')
     
     if not (3 <= len(name) <= 15) or player_type not in ['warrior', 'mage']:
         return
-    
+        
     players[request.sid] = {
         'id': request.sid,
         'name': name,
         'type': player_type,
-        'position': {'x': 0, 'y': -2, 'z': 0}
+        'position': {'x': 0, 'y': -4, 'z': 0}
     }
-    emit('players', list(players.values()), broadcast=True)
+    emit('players', [{'id': id, **data} for id, data in players.items()], broadcast=True)
 
 @socketio.on('playerMove')
 def handle_player_move(position):
-    if not isinstance(position, dict) or not all(k in position for k in ('x', 'y', 'z')):
-        return
-        
     if request.sid in players:
-        x = max(min(float(position['x']), 10), -10)
-        y = max(min(float(position['y']), 5), -2)
-        z = max(min(float(position['z']), 10), -10)
-        
-        players[request.sid]['position'] = {'x': x, 'y': y, 'z': z}
-        emit('playerMoved', {
-            'id': request.sid,
-            'position': players[request.sid]['position']
-        }, broadcast=True)
-
-@socketio.on('getPlayers')
-def handle_get_players():
-    if request.sid in players and players[request.sid]['name'] == 'swami':
-        emit('playerList', [{'id': id, **data} for id, data in players.items()])
+        players[request.sid]['position'] = position
+        emit('playerMoved', {'id': request.sid, 'position': position}, broadcast=True)
 
 @socketio.on('kickPlayer')
 def handle_kick_player(data):
