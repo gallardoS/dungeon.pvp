@@ -3,7 +3,9 @@ from flask_socketio import SocketIO, emit
 from flask_cors import CORS
 import os
 
-app = Flask(__name__, static_folder='../static', template_folder='../static')
+app = Flask(__name__)
+app.static_folder = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'static')
+app.template_folder = app.static_folder
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-secret-key')
 CORS(app, resources={r"/*": {"origins": "*"}})
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
