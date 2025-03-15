@@ -4,7 +4,7 @@ from flask_cors import CORS
 import os
 
 app = Flask(__name__)
-app.static_folder = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'static')
+app.static_folder = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'static'))
 app.template_folder = app.static_folder
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-secret-key')
 CORS(app, resources={r"/*": {"origins": "*"}})
@@ -14,7 +14,13 @@ players = {}
 
 @app.route('/')
 def index():
-    return send_from_directory(app.static_folder, 'index.html')
+    try:
+        return send_from_directory(app.static_folder, 'index.html')
+    except Exception as e:
+        print(f"Error serving index.html: {e}")
+        print(f"Static folder: {app.static_folder}")
+        print(f"Files in static folder: {os.listdir(app.static_folder)}")
+        raise
 
 @app.route('/<path:path>')
 def serve_file(path):
@@ -66,6 +72,8 @@ def handle_player_move(position):
         }, broadcast=True)
 
 if __name__ == '__main__':
+    print(f"Static folder path: {app.static_folder}")
+    print(f"Files in static folder: {os.listdir(app.static_folder)}")
     port = int(os.environ.get('PORT', 10000))
     debug = os.environ.get('FLASK_ENV') == 'development'
     print(f"Starting server on http://0.0.0.0:{port}")
