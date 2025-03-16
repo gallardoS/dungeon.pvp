@@ -7,11 +7,9 @@ let gravity = -0.015;
 let moveSpeed = 0.1;
 let jumpForce = 0.3;
 const floorY = -4;
-let lastMouseX = 0;
 let playerRotation = 0;
 let mouseSensitivity = 0.002;
-let isRotating = false;
-let lastRotationUpdate = 0; 
+let lastRotationUpdate = 0;
 
 const keys = {
     w: false,
@@ -31,7 +29,7 @@ function init() {
 
     camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
     camera.position.set(0, 8, 12);
-    camera.lookAt(new THREE.Vector3(0, 3, 0));
+    camera.lookAt(new THREE.Vector3(1, 2, 1));
 
     renderer = new THREE.WebGLRenderer();
     renderer.setSize(window.innerWidth, window.innerHeight);
@@ -48,9 +46,6 @@ function init() {
     window.addEventListener('resize', onWindowResize, false);
     document.addEventListener('keydown', handleKeyDown);
     document.addEventListener('keyup', handleKeyUp);
-    
-    renderer.domElement.addEventListener('mousedown', handleMouseDown);
-    document.addEventListener('mouseup', handleMouseUp);
     document.addEventListener('mousemove', handleMouseMove);
     
     renderer.domElement.addEventListener('contextmenu', function(event) {
@@ -78,30 +73,35 @@ function init() {
     animate();
 }
 
-function handleMouseDown(event) {
-    if (event.button === 2) {
-        isRotating = true;
-        lastMouseX = event.clientX;
-    }
-}
-
-function handleMouseUp(event) {
-    if (event.button === 2) {
-        isRotating = false;
-    }
-}
-
 function handleMouseMove(event) {
-    if (isRotating) {
-        const deltaX = event.clientX - lastMouseX;
-        playerRotation -= deltaX * mouseSensitivity;
-        lastMouseX = event.clientX;
-        
-        const now = Date.now();
-        if (now - lastRotationUpdate > 30) { 
-            socket.emit('playerRotate', playerRotation);
-            lastRotationUpdate = now;
-        }
+    if (!playerMesh || isChatFocused) return;
+    
+    const rect = renderer.domElement.getBoundingClientRect();
+    const mouseX = event.clientX - rect.left;
+    const mouseY = event.clientY - rect.top;
+    
+    // Convert mouse position to normalized device coordinates (-1 to +1)
+    const ndcX = (mouseX / rect.width) * 2 - 1;
+    const ndcY = -(mouseY / rect.height) * 2 + 1;
+    
+    // Create a ray from the camera through the mouse position
+    const raycaster = new THREE.Raycaster();
+    raycaster.setFromCamera(new THREE.Vector2(ndcX, ndcY), camera);
+    
+    // Get the point where the ray intersects the ground plane
+    const groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -floorY);
+    const targetPoint = new THREE.Vector3();
+    raycaster.ray.intersectPlane(groundPlane, targetPoint);
+    
+    // Calculate the angle between player position and target point
+    const dx = targetPoint.x - playerMesh.position.x;
+    const dz = targetPoint.z - playerMesh.position.z;
+    playerRotation = Math.atan2(dx, dz);
+    
+    const now = Date.now();
+    if (now - lastRotationUpdate > 30) {
+        socket.emit('playerRotate', playerRotation);
+        lastRotationUpdate = now;
     }
 }
 
@@ -120,23 +120,29 @@ function createPlayerName(name) {
     const canvas = document.createElement('canvas');
     const context = canvas.getContext('2d');
     canvas.width = 256;
-    canvas.height = 64;
-    context.font = '32px Metamorphous, serif';
+    canvas.height = 128; 
+    context.font = '48px Metamorphous, serif';
     context.fillStyle = 'white';
     context.textAlign = 'center';
     context.shadowColor = 'rgba(0, 0, 0, 0.8)';
     context.shadowBlur = 4;
     context.shadowOffsetX = 2;
     context.shadowOffsetY = 2;
-    context.fillText(name, canvas.width/2, canvas.height/2);
+    context.fillText(name, canvas.width/2, canvas.height/2 + 16); 
     
     const texture = new THREE.CanvasTexture(canvas);
     const material = new THREE.SpriteMaterial({ map: texture });
     const sprite = new THREE.Sprite(material);
-    sprite.position.y = 3; 
-    sprite.scale.set(2, 0.5, 1);
+    sprite.position.y = 2;
+    sprite.position.x = 0;
+    sprite.position.z = -1;
+    sprite.scale.set(3, 1.5, 1); 
     
-    return sprite;
+    // Create a container for the sprite that will counter-rotate
+    const container = new THREE.Object3D();
+    container.add(sprite);
+    
+    return container;
 }
 
 function initSocket() {
@@ -355,28 +361,23 @@ function updateMovement() {
     let moved = false;
     const movement = { x: 0, z: 0 };
     
-    const direction = new THREE.Vector3();
-    
     if (keys.w) {
-        direction.z = -1;
+        movement.z = -moveSpeed; // Move north
     }
     if (keys.s) {
-        direction.z = 1;
+        movement.z = moveSpeed;  // Move south
     }
     if (keys.a) {
-        direction.x = -1;
+        movement.x = -moveSpeed; // Move west
     }
     if (keys.d) {
-        direction.x = 1;
+        movement.x = moveSpeed;  // Move east
     }
     
-    if (direction.length() > 0) {
-        direction.normalize();
-        
-        direction.applyAxisAngle(new THREE.Vector3(0, 1, 0), playerRotation);
-        
-        movement.x = direction.x * moveSpeed;
-        movement.z = direction.z * moveSpeed;
+    if (movement.x !== 0 || movement.z !== 0) {
+        // Apply movement directly without rotation transformation
+        playerMesh.position.x = Math.max(Math.min(playerMesh.position.x + movement.x, 10), -10);
+        playerMesh.position.z = Math.max(Math.min(playerMesh.position.z + movement.z, 10), -10);
         moved = true;
     }
 
@@ -386,13 +387,15 @@ function updateMovement() {
         moved = true;
     }
 
-    if (movement.x !== 0 || movement.z !== 0) {
-        playerMesh.position.x = Math.max(Math.min(playerMesh.position.x + movement.x, 10), -10);
-        playerMesh.position.z = Math.max(Math.min(playerMesh.position.z + movement.z, 10), -10);
-        moved = true;
-    }
-    
+    // Update rotation to face mouse cursor
     playerMesh.rotation.y = playerRotation;
+    
+    // Counter-rotate the name container to keep it facing north
+    Object.values(players).forEach(player => {
+        if (player.nameSprite) {
+            player.nameSprite.rotation.y = -player.mesh.rotation.y;
+        }
+    });
 
     if (moved) {
         socket.volatile.emit('playerMove', {
@@ -459,7 +462,7 @@ function animate() {
     
     if (playerMesh) {
         const playerPosition = playerMesh.position;
-        const offset = new THREE.Vector3(0, 21, 9);
+        const offset = new THREE.Vector3(0, 21, 1);
         camera.position.copy(playerPosition).add(offset);
         camera.lookAt(playerPosition.clone().add(new THREE.Vector3(0, 0, 0)));
     }
@@ -491,16 +494,13 @@ function showChat() {
 }
 
 function createDirectionalTriangle() {
-    const geometry = new THREE.ConeGeometry(0.5, 2, 3);
-    const material = new THREE.MeshBasicMaterial({ 
-        color: 0xFF3333,
-        transparent: true,
-        opacity: 0.8
-    });
+    const geometry = new THREE.ConeGeometry(0.3, 1, 32);
+    const material = new THREE.MeshBasicMaterial({ color: 0xff0000 });
     const cone = new THREE.Mesh(geometry, material);
-    cone.rotation.x = Math.PI/2;
-    cone.rotation.z = Math.PI;
-    cone.position.z = -1.5;
+    cone.rotation.x = Math.PI / 2;
+    cone.position.z = 1.0;
+    cone.position.x = -0.5; 
+    cone.position.y = 1.2;
     return cone;
 }
 
