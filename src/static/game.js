@@ -459,10 +459,9 @@ function animate() {
     
     if (playerMesh) {
         const playerPosition = playerMesh.position;
-        const offset = new THREE.Vector3(0, 21, 5);
-        offset.applyQuaternion(playerMesh.quaternion);
+        const offset = new THREE.Vector3(0, 21, 9);
         camera.position.copy(playerPosition).add(offset);
-        camera.lookAt(playerPosition.clone().add(new THREE.Vector3(0, 3, 0)));
+        camera.lookAt(playerPosition.clone().add(new THREE.Vector3(0, 0, 0)));
     }
     
     updateMovement();
