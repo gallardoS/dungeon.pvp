@@ -21,6 +21,10 @@ const keys = {
     ' ': false
 };
 
+let lastChatTime = Date.now();
+let chatFadeTimer = null;
+let isChatFocused = false;
+
 function init() {
     scene = new THREE.Scene();
     scene.background = new THREE.Color(0x808080);
@@ -50,6 +54,24 @@ function init() {
     
     renderer.domElement.addEventListener('contextmenu', function(event) {
         event.preventDefault();
+    });
+
+    const messageInput = document.getElementById('messageInput');
+    messageInput.addEventListener('focus', function() {
+        isChatFocused = true;
+    });
+    
+    messageInput.addEventListener('blur', function() {
+        isChatFocused = false;
+    });
+    
+    const chatContainer = document.getElementById('chatContainer');
+    chatContainer.addEventListener('mouseenter', function() {
+        showChat();
+    });
+    
+    chatContainer.addEventListener('mouseleave', function() {
+        resetChatFadeTimer();
     });
 
     animate();
@@ -98,7 +120,7 @@ function createPlayerName(name) {
     const context = canvas.getContext('2d');
     canvas.width = 256;
     canvas.height = 64;
-    context.font = '32px Arial';
+    context.font = '32px Metamorphous, serif';
     context.fillStyle = 'white';
     context.textAlign = 'center';
     context.fillText(name, canvas.width/2, canvas.height/2);
@@ -231,6 +253,38 @@ function addChatMessage(sender, message, timestamp) {
     while (chatMessages.children.length > 50) {
         chatMessages.removeChild(chatMessages.firstChild);
     }
+    
+    lastChatTime = Date.now();
+    
+    document.querySelectorAll('.chat-message').forEach(msg => {
+        msg.classList.remove('fading');
+    });
+    
+    const chatContainer = document.getElementById('chatContainer');
+    const chatMessagesElement = document.getElementById('chatMessages');
+    
+    if (chatContainer) chatContainer.classList.remove('fading');
+    if (chatMessagesElement) chatMessagesElement.classList.remove('fading');
+    
+    resetChatFadeTimer();
+}
+
+function resetChatFadeTimer() {
+    if (chatFadeTimer) {
+        clearTimeout(chatFadeTimer);
+    }
+    
+    chatFadeTimer = setTimeout(() => {
+        document.querySelectorAll('.chat-message').forEach(msg => {
+            msg.classList.add('fading');
+        });
+        
+        const chatContainer = document.getElementById('chatContainer');
+        const chatMessages = document.getElementById('chatMessages');
+        
+        if (chatContainer) chatContainer.classList.add('fading');
+        if (chatMessages) chatMessages.classList.add('fading');
+    }, 5000);
 }
 
 function sendChatMessage() {
@@ -240,6 +294,8 @@ function sendChatMessage() {
     if (message && socket) {
         socket.emit('chatMessage', { message });
         messageInput.value = '';
+        
+        resetChatFadeTimer();
     }
 }
 
@@ -265,6 +321,10 @@ function kickPlayer(playerId) {
 }
 
 function handleKeyDown(event) {
+    if (isChatFocused && ['w', 'a', 's', 'd', ' '].includes(event.key.toLowerCase())) {
+        return;
+    }
+    
     const key = event.key.toLowerCase();
     if (key in keys) {
         keys[key] = true;
@@ -280,6 +340,8 @@ function handleKeyUp(event) {
 
 function updateMovement() {
     if (!playerMesh) return;
+    
+    if (isChatFocused) return;
 
     let moved = false;
     const movement = { x: 0, z: 0 };
@@ -424,6 +486,20 @@ function updateGameSettings(settings) {
     if (settings.jumpForce !== undefined) jumpForce = settings.jumpForce;
     if (settings.gravity !== undefined) gravity = settings.gravity;
     if (settings.mouseSensitivity !== undefined) mouseSensitivity = settings.mouseSensitivity;
+}
+
+function showChat() {
+    const chatContainer = document.getElementById('chatContainer');
+    const chatMessages = document.getElementById('chatMessages');
+    
+    if (chatContainer) chatContainer.classList.remove('fading');
+    if (chatMessages) chatMessages.classList.remove('fading');
+    
+    document.querySelectorAll('.chat-message').forEach(msg => {
+        msg.classList.remove('fading');
+    });
+    
+    resetChatFadeTimer();
 }
 
 window.updateGameSettings = updateGameSettings;

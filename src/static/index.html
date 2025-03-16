@@ -1,8 +1,19 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dungeon PvP</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Metamorphous&display=swap" rel="stylesheet">
     <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Metamorphous', serif;
+        }
         body { margin: 0; overflow: hidden; }
         #ui {
             position: fixed;
@@ -38,7 +49,7 @@
             border-radius: 10px;
             z-index: 1001;
             cursor: pointer;
-            font-family: Arial, sans-serif;
+            font-family: 'Metamorphous', serif;
             border: 1px solid #444;
         }
         #debugToggle:hover {
@@ -54,7 +65,7 @@
             border-radius: 10px;
             z-index: 1000;
             min-width: 250px;
-            font-family: Arial, sans-serif;
+            font-family: 'Metamorphous', serif;
             transition: transform 0.3s ease, opacity 0.3s ease;
             max-height: 80vh;
             overflow-y: auto;
@@ -168,12 +179,12 @@
         .kick-button:hover {
             background: #ff6666;
         }
-        /* Estilos para el chat */
+
         #chatContainer {
             position: fixed;
             bottom: 50px;
             left: 10px;
-            width: 300px;
+            width: 350px;
             background: rgba(0, 0, 0, 0.8);
             border-radius: 10px;
             color: white;
@@ -181,6 +192,11 @@
             display: flex;
             flex-direction: column;
             max-height: 300px;
+            transition: background-color 1s ease-out;
+            font-family: 'Metamorphous', serif;
+        }
+        #chatContainer.fading {
+            background: rgba(0, 0, 0, 0);
         }
         #chatMessages {
             padding: 10px;
@@ -189,12 +205,37 @@
             display: flex;
             flex-direction: column;
             gap: 5px;
+            transition: opacity 1s ease-out;
+            scrollbar-width: thin;
+            scrollbar-color: rgba(100, 100, 100, 0.5) transparent;
+        }
+        #chatMessages::-webkit-scrollbar {
+            width: 6px;
+        }
+        #chatMessages::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        #chatMessages::-webkit-scrollbar-thumb {
+            background-color: rgba(100, 100, 100, 0.5);
+            border-radius: 10px;
+            border: none;
+        }
+        #chatMessages::-webkit-scrollbar-thumb:hover {
+            background-color: rgba(150, 150, 150, 0.7);
+        }
+        #chatMessages.fading {
+            opacity: 0;
         }
         .chat-message {
             padding: 5px 8px;
             border-radius: 5px;
             background: rgba(128, 128, 128, 0.3);
             word-wrap: break-word;
+            transition: opacity 1s ease-out;
+            opacity: 1;
+        }
+        .chat-message.fading {
+            opacity: 0;
         }
         .chat-message .sender {
             font-weight: bold;
@@ -208,14 +249,25 @@
         #chatInput {
             display: flex;
             padding: 5px;
-            border-top: 1px solid #444;
+            border-top: none;
         }
         #chatInput input {
             flex-grow: 1;
             margin-right: 5px;
+            border-radius: 15px;
+            padding: 8px 15px;
+            background: rgba(30, 30, 30, 0.7);
+            border: 1px solid #555;
+            color: white;
+        }
+        #chatInput input:focus {
+            outline: none;
+            border-color: #777;
+            box-shadow: 0 0 5px rgba(255, 255, 255, 0.2);
         }
         #chatInput button {
             padding: 5px 10px;
+            border-radius: 15px;
         }
     </style>
 </head>
