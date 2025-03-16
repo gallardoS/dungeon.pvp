@@ -6,18 +6,23 @@ import { scene, camera, renderer, floorY, initScene, animate } from './js/scene.
 import { 
     initPlayerControls, 
     updatePlayer, 
-    setSocket, 
-    addPlayer, 
-    removePlayer, 
-    updatePlayerPosition, 
-    updatePlayerRotation,
+    setSocket as setPlayerSocket, 
     getPlayerMesh,
-    getPlayers,
+    createMainPlayer,
     updateGameSettings as updatePlayerSettings
 } from './js/player.js';
+// Import players manager module
+import {
+    setSocket as setPlayersManagerSocket,
+    processPlayerList,
+    interpolatePlayerPositions,
+    updatePlayerPosition,
+    updatePlayerRotation,
+    getPlayers,
+    hasPlayer
+} from './js/playersManager.js';
 
 let socket;
-let players = {};
 
 function init() {
     // Initialize scene, camera and renderer
@@ -28,11 +33,17 @@ function init() {
     
     // Start the animation loop with our update function
     animate(updateGame);
+    
+    // Initialize socket connection
+    initSocket();
 }
 
 function updateGame() {
     // Update player position, physics, and camera
     updatePlayer(isChatInputFocused);
+    
+    // Interpolate other players' positions
+    interpolatePlayerPositions();
 }
 
 function initSocket() {
@@ -53,53 +64,38 @@ function initSocket() {
     });
 
     socket.on('players', playerList => {
-        playerList.forEach(player => {
-            if (!players[player.id]) {
-                // Add new player
-                addPlayer(player, socket.id);
-                
-                // Show admin panel if player is admin
-                if (player.id === socket.id && player.name === 'swami') {
-                    document.getElementById('adminPanel').classList.remove('hidden');
-                }
-            } else if (player.id !== socket.id) {
-                // Update existing player
-                const playerData = {
-                    id: player.id,
-                    position: player.position
-                };
-                updatePlayerPosition(playerData);
-                
-                if (player.rotation !== undefined) {
-                    const rotationData = {
-                        id: player.id,
-                        rotation: player.rotation
-                    };
-                    updatePlayerRotation(rotationData);
-                }
+        console.log('Received player list:', playerList);
+        
+        // Check for current player and create/update if needed
+        const currentPlayer = playerList.find(p => p.id === socket.id);
+        if (currentPlayer) {
+            console.log('Found current player in list:', currentPlayer);
+            
+            // Check if we need to create the main player
+            if (!getPlayerMesh()) {
+                console.log('Creating main player');
+                createMainPlayer(currentPlayer);
             }
-        });
-
-        // Remove players that are no longer in the list
-        Object.keys(players).forEach(id => {
-            if (!playerList.find(p => p.id === id)) {
-                removePlayer(id);
+            
+            // Show admin panel if player is admin
+            if (currentPlayer.name === 'swami') {
+                document.getElementById('adminPanel').classList.remove('hidden');
+                updateAdminPlayerList(playerList);
             }
-        });
-
-        // Update admin player list if player is admin
-        const playersList = getPlayers();
-        if (playersList[socket.id] && playersList[socket.id].name === 'swami') {
-            updateAdminPlayerList(playerList);
         }
+        
+        // Process all other players
+        processPlayerList(playerList, socket.id);
     });
 
     socket.on('playerMoved', data => {
-        updatePlayerPosition(data);
+        console.log('Player moved:', data.id);
+        updatePlayerPosition(data, socket.id);
     });
     
     socket.on('playerRotated', data => {
-        updatePlayerRotation(data);
+        console.log('Player rotated:', data.id);
+        updatePlayerRotation(data, socket.id);
     });
 
     socket.on('kicked', () => {
@@ -109,7 +105,8 @@ function initSocket() {
 
     // Initialize chat module with socket instance
     initChat(socket);
-    setSocket(socket);
+    setPlayerSocket(socket);
+    setPlayersManagerSocket(socket);
 }
 
 function updateAdminPlayerList(playerList) {
@@ -166,10 +163,16 @@ window.selectCharacter = function(type) {
     document.getElementById('debugToggle').classList.remove('hidden');
     document.getElementById('chatContainer').classList.remove('hidden');
     window.playerType = type;
+    
+    // Emit player selection to server
     socket.emit('playerSelect', {
         name: window.playerName,
         type: type
     });
+    
+    // Create main player with initial data
+    // Note: We don't create the player here anymore, we'll wait for the server to send it back
+    // This ensures consistency between client and server
     
     // Add event listeners for chat buttons
     document.getElementById('sendButton').addEventListener('click', sendChatMessage);
@@ -181,21 +184,37 @@ window.selectCharacter = function(type) {
     
     // Add event listener for debug toggle
     document.getElementById('debugToggle').addEventListener('click', toggleDebugPanel);
+};
+
+window.kickPlayer = kickPlayer;
+
+function toggleDebugPanel() {
+    const debugPanel = document.getElementById('debugPanel');
+    debugPanel.classList.toggle('hidden');
+    debugPanel.classList.toggle('collapsed');
 }
 
-// Add toggleDebugPanel function
-function toggleDebugPanel() {
-    const panel = document.getElementById('debugPanel');
-    if (panel.classList.contains('collapsed')) {
-        panel.classList.remove('collapsed');
-        panel.classList.remove('hidden');
+window.validateName = function() {
+    const nameInput = document.getElementById('playerName');
+    const name = nameInput.value.trim();
+    const errorElement = document.getElementById('nameError');
+    
+    if (name.length < 3) {
+        errorElement.textContent = 'Name must be at least 3 characters';
+        return false;
+    } else if (name.length > 15) {
+        errorElement.textContent = 'Name must be at most 15 characters';
+        return false;
     } else {
-        panel.classList.add('collapsed');
+        errorElement.textContent = '';
+        window.playerName = name;
+        document.getElementById('nameForm').classList.add('hidden');
+        document.getElementById('characterSelect').classList.remove('hidden');
+        return true;
     }
-}
+};
 
 // Initialize the game when the module is loaded
 document.addEventListener('DOMContentLoaded', () => {
     init();
-    initSocket();
 });

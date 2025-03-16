@@ -16,7 +16,6 @@ let jumpForce = 0.3;
 let playerRotation = 0;
 let mouseSensitivity = 0.002;
 let lastRotationUpdate = 0;
-let players = {};
 let socket;
 
 // Keyboard state
@@ -41,38 +40,42 @@ function initPlayerControls(isChatInputFocused) {
 
 /**
  * Handle mouse movement for player rotation
- * @param {Event} event - Mouse event
+ * @param {Event} event - Mouse move event
  * @param {Function} isChatInputFocused - Function to check if chat input is focused
  */
 function handleMouseMove(event, isChatInputFocused) {
-    if (!playerMesh || isChatInputFocused()) return;
+    if (isChatInputFocused()) return;
     
-    const rect = renderer.domElement.getBoundingClientRect();
-    const mouseX = event.clientX - rect.left;
-    const mouseY = event.clientY - rect.top;
-    
-    // Convert mouse position to normalized device coordinates (-1 to +1)
-    const ndcX = (mouseX / rect.width) * 2 - 1;
-    const ndcY = -(mouseY / rect.height) * 2 + 1;
-    
-    // Create a ray from the camera through the mouse position
-    const raycaster = new THREE.Raycaster();
-    raycaster.setFromCamera(new THREE.Vector2(ndcX, ndcY), camera);
-    
-    // Get the point where the ray intersects the ground plane
-    const groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -floorY);
-    const targetPoint = new THREE.Vector3();
-    raycaster.ray.intersectPlane(groundPlane, targetPoint);
-    
-    // Calculate the angle between player position and target point
-    const dx = targetPoint.x - playerMesh.position.x;
-    const dz = targetPoint.z - playerMesh.position.z;
-    playerRotation = Math.atan2(dx, dz);
-    
-    const now = Date.now();
-    if (now - lastRotationUpdate > 30) {
-        socket.emit('playerRotate', playerRotation);
-        lastRotationUpdate = now;
+    if (playerMesh) {
+        // Usar el método de raycasting para determinar la dirección de rotación
+        const rect = renderer.domElement.getBoundingClientRect();
+        const mouseX = event.clientX - rect.left;
+        const mouseY = event.clientY - rect.top;
+        
+        // Convertir posición del mouse a coordenadas normalizadas (-1 a +1)
+        const ndcX = (mouseX / rect.width) * 2 - 1;
+        const ndcY = -(mouseY / rect.height) * 2 + 1;
+        
+        // Crear un rayo desde la cámara a través de la posición del mouse
+        const raycaster = new THREE.Raycaster();
+        raycaster.setFromCamera(new THREE.Vector2(ndcX, ndcY), camera);
+        
+        // Obtener el punto donde el rayo intersecta con el plano del suelo
+        const groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -floorY);
+        const targetPoint = new THREE.Vector3();
+        raycaster.ray.intersectPlane(groundPlane, targetPoint);
+        
+        // Calcular el ángulo entre la posición del jugador y el punto objetivo
+        const dx = targetPoint.x - playerMesh.position.x;
+        const dz = targetPoint.z - playerMesh.position.z;
+        playerRotation = Math.atan2(dx, dz);
+        
+        // Emitir actualización de rotación al servidor (limitada)
+        const now = Date.now();
+        if (now - lastRotationUpdate > 50) { // Limitar a 20 actualizaciones por segundo
+            lastRotationUpdate = now;
+            socket.volatile.emit('playerRotate', playerRotation);
+        }
     }
 }
 
@@ -209,13 +212,6 @@ function updateMovement(isChatInputFocused) {
     // Update rotation to face mouse cursor
     playerMesh.rotation.y = playerRotation;
     
-    // Counter-rotate the name container to keep it facing north
-    Object.values(players).forEach(player => {
-        if (player.nameSprite) {
-            player.nameSprite.rotation.y = -player.mesh.rotation.y;
-        }
-    });
-
     if (moved) {
         socket.volatile.emit('playerMove', {
             x: playerMesh.position.x,
@@ -223,30 +219,6 @@ function updateMovement(isChatInputFocused) {
             z: playerMesh.position.z
         });
     }
-
-    // Update other players' positions and rotations
-    Object.values(players).forEach(player => {
-        if (player.mesh !== playerMesh) {
-            if (player.targetPosition) {
-                const t = Math.min((Date.now() - player.lastUpdate) / 100, 1);
-                player.mesh.position.x += (player.targetPosition.x - player.mesh.position.x) * t;
-                player.mesh.position.y += (player.targetPosition.y - player.mesh.position.y) * t;
-                player.mesh.position.z += (player.targetPosition.z - player.mesh.position.z) * t;
-            }
-            
-            if (player.targetRotation !== undefined) {
-                const t = Math.min((Date.now() - player.lastRotationUpdate) / 50, 1);
-                const currentRotation = player.mesh.rotation.y;
-                let targetRotation = player.targetRotation;
-                
-                const diff = targetRotation - currentRotation;
-                if (diff > Math.PI) targetRotation -= Math.PI * 2;
-                if (diff < -Math.PI) targetRotation += Math.PI * 2;
-                
-                player.mesh.rotation.y += (targetRotation - player.mesh.rotation.y) * (t * 1.5);
-            }
-        }
-    });
 }
 
 /**
@@ -291,83 +263,6 @@ function setSocket(socketInstance) {
 }
 
 /**
- * Add a player to the scene
- * @param {Object} player - Player data
- * @param {string} socketId - Current player's socket ID
- * @returns {Object} - Player object with mesh and other properties
- */
-function addPlayer(player, socketId) {
-    const mesh = createCharacterMesh(player.type);
-    mesh.position.set(player.position.x, player.position.y, player.position.z);
-    if (player.rotation !== undefined) {
-        mesh.rotation.y = player.rotation;
-    }
-    scene.add(mesh);
-    
-    const nameSprite = createPlayerName(player.name);
-    mesh.add(nameSprite);
-    
-    const directionalTriangle = createDirectionalTriangle();
-    mesh.add(directionalTriangle);
-    
-    const playerObj = {
-        mesh: mesh,
-        nameSprite: nameSprite,
-        directionalTriangle: directionalTriangle,
-        type: player.type,
-        name: player.name,
-        lastUpdate: Date.now(),
-        targetPosition: { ...player.position },
-        targetRotation: player.rotation || 0,
-        lastRotationUpdate: Date.now()
-    };
-    
-    players[player.id] = playerObj;
-    
-    if (player.id === socketId) {
-        playerMesh = mesh;
-        playerRotation = player.rotation || 0;
-    }
-    
-    return playerObj;
-}
-
-/**
- * Remove a player from the scene
- * @param {string} playerId - Player ID to remove
- */
-function removePlayer(playerId) {
-    if (players[playerId]) {
-        scene.remove(players[playerId].mesh);
-        delete players[playerId];
-    }
-}
-
-/**
- * Update player position
- * @param {Object} data - Player position data
- */
-function updatePlayerPosition(data) {
-    if (players[data.id] && data.id !== socket.id) {
-        const player = players[data.id];
-        player.targetPosition = { ...data.position };
-        player.lastUpdate = Date.now();
-    }
-}
-
-/**
- * Update player rotation
- * @param {Object} data - Player rotation data
- */
-function updatePlayerRotation(data) {
-    if (players[data.id] && data.id !== socket.id) {
-        const player = players[data.id];
-        player.targetRotation = data.rotation;
-        player.lastRotationUpdate = Date.now();
-    }
-}
-
-/**
  * Get the current player mesh
  * @returns {THREE.Mesh} - Current player mesh
  */
@@ -376,11 +271,48 @@ function getPlayerMesh() {
 }
 
 /**
- * Get all players
- * @returns {Object} - All players
+ * Create and set up the main player
+ * @param {Object} playerData - Player data from server
+ * @returns {THREE.Mesh} - Player mesh
  */
-function getPlayers() {
-    return players;
+function createMainPlayer(playerData) {
+    console.log('Creating main player with data:', playerData);
+    
+    // Create player mesh
+    const mesh = createCharacterMesh(playerData.type);
+    
+    // Set position
+    if (playerData.position) {
+        mesh.position.set(
+            playerData.position.x, 
+            playerData.position.y, 
+            playerData.position.z
+        );
+    }
+    
+    // Set rotation
+    if (playerData.rotation !== undefined) {
+        mesh.rotation.y = playerData.rotation;
+        playerRotation = playerData.rotation;
+    }
+    
+    // Add to scene
+    scene.add(mesh);
+    console.log('Main player mesh added to scene');
+    
+    // Add name sprite
+    const nameSprite = createPlayerName(playerData.name);
+    mesh.add(nameSprite);
+    
+    // Add directional indicator
+    const directionalTriangle = createDirectionalTriangle();
+    mesh.add(directionalTriangle);
+    
+    // Set as player mesh
+    playerMesh = mesh;
+    
+    console.log('Main player created successfully');
+    return mesh;
 }
 
 /**
@@ -393,6 +325,12 @@ function updatePlayer(isChatInputFocused) {
     
     if (playerMesh) {
         updateCameraPosition(playerMesh);
+        
+        // Update name sprite rotation to always face camera
+        const nameContainer = playerMesh.children.find(child => child instanceof THREE.Object3D && child.children.length > 0 && child.children[0] instanceof THREE.Sprite);
+        if (nameContainer) {
+            nameContainer.rotation.y = -playerMesh.rotation.y;
+        }
     }
 }
 
@@ -406,11 +344,7 @@ export {
     applyPhysics,
     updateGameSettings,
     setSocket,
-    addPlayer,
-    removePlayer,
-    updatePlayerPosition,
-    updatePlayerRotation,
     getPlayerMesh,
-    getPlayers,
+    createMainPlayer,
     updatePlayer
 };
