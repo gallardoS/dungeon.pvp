@@ -1,3 +1,6 @@
+// Import chat module
+import { initChat, addChatMessage, sendChatMessage, isChatInputFocused } from './js/chat.js';
+
 let scene, camera, renderer, socket;
 let players = {};
 let playerMesh;
@@ -36,10 +39,6 @@ const keys = {
     d: false,
     ' ': false
 };
-
-let lastChatTime = Date.now();
-let chatFadeTimer = null;
-let isChatFocused = false;
 
 function init() {
     scene = new THREE.Scene();
@@ -82,29 +81,11 @@ function init() {
         event.preventDefault();
     });
 
-    const messageInput = document.getElementById('messageInput');
-    messageInput.addEventListener('focus', function() {
-        isChatFocused = true;
-    });
-    
-    messageInput.addEventListener('blur', function() {
-        isChatFocused = false;
-    });
-    
-    const chatContainer = document.getElementById('chatContainer');
-    chatContainer.addEventListener('mouseenter', function() {
-        showChat();
-    });
-    
-    chatContainer.addEventListener('mouseleave', function() {
-        resetChatFadeTimer();
-    });
-
     animate();
 }
 
 function handleMouseMove(event) {
-    if (!playerMesh || isChatFocused) return;
+    if (!playerMesh || isChatInputFocused()) return;
     
     const rect = renderer.domElement.getBoundingClientRect();
     const mouseX = event.clientX - rect.left;
@@ -273,75 +254,8 @@ function initSocket() {
         window.location.reload();
     });
 
-    socket.on('chatMessage', data => {
-        addChatMessage(data.sender, data.message, data.timestamp);
-    });
-}
-
-function addChatMessage(sender, message, timestamp) {
-    const chatMessages = document.getElementById('chatMessages');
-    const messageElement = document.createElement('div');
-    messageElement.className = 'chat-message';
-    
-    const time = new Date(timestamp);
-    const timeString = `${time.getHours().toString().padStart(2, '0')}:${time.getMinutes().toString().padStart(2, '0')}`;
-    
-    messageElement.innerHTML = `
-        <span class="sender">${sender}:</span>
-        ${message}
-        <span class="timestamp">${timeString}</span>
-    `;
-    
-    chatMessages.appendChild(messageElement);
-    chatMessages.scrollTop = chatMessages.scrollHeight;
-    
-    while (chatMessages.children.length > 50) {
-        chatMessages.removeChild(chatMessages.firstChild);
-    }
-    
-    lastChatTime = Date.now();
-    
-    document.querySelectorAll('.chat-message').forEach(msg => {
-        msg.classList.remove('fading');
-    });
-    
-    const chatContainer = document.getElementById('chatContainer');
-    const chatMessagesElement = document.getElementById('chatMessages');
-    
-    if (chatContainer) chatContainer.classList.remove('fading');
-    if (chatMessagesElement) chatMessagesElement.classList.remove('fading');
-    
-    resetChatFadeTimer();
-}
-
-function resetChatFadeTimer() {
-    if (chatFadeTimer) {
-        clearTimeout(chatFadeTimer);
-    }
-    
-    chatFadeTimer = setTimeout(() => {
-        document.querySelectorAll('.chat-message').forEach(msg => {
-            msg.classList.add('fading');
-        });
-        
-        const chatContainer = document.getElementById('chatContainer');
-        const chatMessages = document.getElementById('chatMessages');
-        
-        if (chatContainer) chatContainer.classList.add('fading');
-        if (chatMessages) chatMessages.classList.add('fading');
-    }, 5000);
-}
-
-function sendChatMessage() {
-    const messageInput = document.getElementById('messageInput');
-    const message = messageInput.value.trim();
-    
-    if (message && socket) {
-        socket.emit('chatMessage', { message });
-        messageInput.value = '';
-        
-        resetChatFadeTimer();
-    }
+    // Initialize chat module with socket instance
+    initChat(socket);
 }
 
 function updateAdminPlayerList(playerList) {
@@ -366,7 +280,7 @@ function kickPlayer(playerId) {
 }
 
 function handleKeyDown(event) {
-    if (isChatFocused && ['w', 'a', 's', 'd', ' '].includes(event.key.toLowerCase())) {
+    if (isChatInputFocused() && ['w', 'a', 's', 'd', ' '].includes(event.key.toLowerCase())) {
         return;
     }
     
@@ -386,7 +300,7 @@ function handleKeyUp(event) {
 function updateMovement() {
     if (!playerMesh) return;
     
-    if (isChatFocused) return;
+    if (isChatInputFocused()) return;
 
     let moved = false;
     const movement = { x: 0, z: 0 };
@@ -509,20 +423,6 @@ function updateGameSettings(settings) {
     if (settings.mouseSensitivity !== undefined) mouseSensitivity = settings.mouseSensitivity;
 }
 
-function showChat() {
-    const chatContainer = document.getElementById('chatContainer');
-    const chatMessages = document.getElementById('chatMessages');
-    
-    if (chatContainer) chatContainer.classList.remove('fading');
-    if (chatMessages) chatMessages.classList.remove('fading');
-    
-    document.querySelectorAll('.chat-message').forEach(msg => {
-        msg.classList.remove('fading');
-    });
-    
-    resetChatFadeTimer();
-}
-
 function createDirectionalTriangle() {
     const geometry = new THREE.ConeGeometry(0.3, 1, 32);
     const material = new THREE.MeshBasicMaterial({ color: 0xff0000 });
@@ -534,5 +434,46 @@ function createDirectionalTriangle() {
     return cone;
 }
 
+// Export functions for use in HTML
 window.updateGameSettings = updateGameSettings;
 window.sendChatMessage = sendChatMessage;
+window.init = init;
+window.initSocket = initSocket;
+window.selectCharacter = function(type) {
+    document.getElementById('ui').classList.add('hidden');
+    document.getElementById('debugToggle').classList.remove('hidden');
+    document.getElementById('chatContainer').classList.remove('hidden');
+    window.playerType = type;
+    socket.emit('playerSelect', {
+        name: window.playerName,
+        type: type
+    });
+    
+    // Add event listeners for chat buttons
+    document.getElementById('sendButton').addEventListener('click', sendChatMessage);
+    document.getElementById('messageInput').addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            sendChatMessage();
+        }
+    });
+    
+    // Add event listener for debug toggle
+    document.getElementById('debugToggle').addEventListener('click', toggleDebugPanel);
+}
+
+// Add toggleDebugPanel function
+function toggleDebugPanel() {
+    const panel = document.getElementById('debugPanel');
+    if (panel.classList.contains('collapsed')) {
+        panel.classList.remove('collapsed');
+        panel.classList.remove('hidden');
+    } else {
+        panel.classList.add('collapsed');
+    }
+}
+
+// Initialize the game when the module is loaded
+document.addEventListener('DOMContentLoaded', () => {
+    init();
+    initSocket();
+});

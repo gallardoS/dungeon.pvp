@@ -332,7 +332,7 @@
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
-    <script src="game.js"></script>
+    <script type="module" src="game.js"></script>
     <script>
         function submitName() {
             const nameInput = document.getElementById('playerName');
@@ -343,36 +343,6 @@
                 window.playerName = name;
             } else {
                 alert('Name must be between 3 and 15 characters');
-            }
-        }
-
-        function selectCharacter(type) {
-            document.getElementById('ui').classList.add('hidden');
-            document.getElementById('debugToggle').classList.remove('hidden');
-            document.getElementById('chatContainer').classList.remove('hidden');
-            window.playerType = type;
-            socket.emit('playerSelect', {
-                name: window.playerName,
-                type: type
-            });
-            
-            document.getElementById('sendButton').addEventListener('click', sendChatMessage);
-            document.getElementById('messageInput').addEventListener('keypress', function(e) {
-                if (e.key === 'Enter') {
-                    sendChatMessage();
-                }
-            });
-            
-            document.getElementById('debugToggle').addEventListener('click', toggleDebugPanel);
-        }
-        
-        function toggleDebugPanel() {
-            const panel = document.getElementById('debugPanel');
-            if (panel.classList.contains('collapsed')) {
-                panel.classList.remove('collapsed');
-                panel.classList.remove('hidden');
-            } else {
-                panel.classList.add('collapsed');
             }
         }
 
@@ -405,9 +375,6 @@
             document.getElementById('mouseSensitivityValue').textContent = value;
             window.updateGameSettings({ mouseSensitivity: value });
         });
-
-        init();
-        initSocket();
     </script>
 </body>
 </html>
