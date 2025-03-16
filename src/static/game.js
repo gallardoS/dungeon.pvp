@@ -123,6 +123,10 @@ function createPlayerName(name) {
     context.font = '32px Metamorphous, serif';
     context.fillStyle = 'white';
     context.textAlign = 'center';
+    context.shadowColor = 'rgba(0, 0, 0, 0.8)';
+    context.shadowBlur = 4;
+    context.shadowOffsetX = 2;
+    context.shadowOffsetY = 2;
     context.fillText(name, canvas.width/2, canvas.height/2);
     
     const texture = new THREE.CanvasTexture(canvas);
