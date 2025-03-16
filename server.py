@@ -30,12 +30,14 @@ def handle_disconnect():
         emit('players', list(players.values()), broadcast=True)
 
 @socketio.on('playerSelect')
-def handle_player_select(character_type):
-    print(f'Player {request.sid} selected character: {character_type}')
+def handle_player_select(data):
+    print(f'Player {request.sid} selected character: {data["type"]} with name: {data["name"]}')
     players[request.sid] = {
         'id': request.sid,
-        'type': character_type,
-        'position': {'x': 0, 'y': -2, 'z': 0}  # Start at ground level (y = -2)
+        'type': data['type'],
+        'name': data['name'],
+        'position': {'x': 0, 'y': -2, 'z': 0},  # Start at ground level (y = -2)
+        'rotation': 0  # Initialize rotation to 0
     }
     print('Current players:', players)
     emit('players', list(players.values()), broadcast=True)
@@ -47,6 +49,15 @@ def handle_player_move(position):
         emit('playerMoved', {
             'id': request.sid,
             'position': position
+        }, broadcast=True)
+
+@socketio.on('playerRotate')
+def handle_player_rotate(rotation):
+    if request.sid in players:
+        players[request.sid]['rotation'] = rotation
+        emit('playerRotated', {
+            'id': request.sid,
+            'rotation': rotation
         }, broadcast=True)
 
 if __name__ == '__main__':

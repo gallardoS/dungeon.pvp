@@ -11,6 +11,7 @@ let lastMouseX = 0;
 let playerRotation = 0;
 let mouseSensitivity = 0.002;
 let isRotating = false;
+let lastRotationUpdate = 0; // Track when we last sent a rotation update
 
 const keys = {
     w: false,
@@ -77,6 +78,13 @@ function handleMouseMove(event) {
         const deltaX = event.clientX - lastMouseX;
         playerRotation -= deltaX * mouseSensitivity;
         lastMouseX = event.clientX;
+        
+        // Enviar la rotación al servidor (limitar la frecuencia de envío)
+        const now = Date.now();
+        if (now - lastRotationUpdate > 30) { // Increased frequency from 50ms to 30ms
+            socket.emit('playerRotate', playerRotation); // Changed from volatile.emit to emit for more reliability
+            lastRotationUpdate = now;
+        }
     }
 }
 
@@ -132,6 +140,9 @@ function initSocket() {
             if (!players[player.id]) {
                 const mesh = createCharacterMesh(player.type);
                 mesh.position.set(player.position.x, player.position.y, player.position.z);
+                if (player.rotation !== undefined) {
+                    mesh.rotation.y = player.rotation;
+                }
                 scene.add(mesh);
                 
                 const nameSprite = createPlayerName(player.name);
@@ -143,11 +154,14 @@ function initSocket() {
                     type: player.type,
                     name: player.name,
                     lastUpdate: Date.now(),
-                    targetPosition: { ...player.position }
+                    targetPosition: { ...player.position },
+                    targetRotation: player.rotation || 0,
+                    lastRotationUpdate: Date.now()
                 };
                 
                 if (player.id === socket.id) {
                     playerMesh = mesh;
+                    playerRotation = player.rotation || 0;
                 
                     if (player.name === 'swami') {
                         document.getElementById('adminPanel').classList.remove('hidden');
@@ -156,6 +170,10 @@ function initSocket() {
             } else if (player.id !== socket.id) {
                 const existingPlayer = players[player.id];
                 existingPlayer.targetPosition = { ...player.position };
+                if (player.rotation !== undefined) {
+                    existingPlayer.targetRotation = player.rotation;
+                    existingPlayer.lastRotationUpdate = Date.now();
+                }
                 existingPlayer.lastUpdate = Date.now();
             }
         });
@@ -178,6 +196,14 @@ function initSocket() {
             const player = players[data.id];
             player.targetPosition = { ...data.position };
             player.lastUpdate = Date.now();
+        }
+    });
+    
+    socket.on('playerRotated', data => {
+        if (players[data.id] && data.id !== socket.id) {
+            const player = players[data.id];
+            player.targetRotation = data.rotation;
+            player.lastRotationUpdate = Date.now();
         }
     });
 
@@ -318,11 +344,29 @@ function updateMovement() {
     }
 
     Object.values(players).forEach(player => {
-        if (player.mesh !== playerMesh && player.targetPosition) {
-            const t = Math.min((Date.now() - player.lastUpdate) / 100, 1);
-            player.mesh.position.x += (player.targetPosition.x - player.mesh.position.x) * t;
-            player.mesh.position.y += (player.targetPosition.y - player.mesh.position.y) * t;
-            player.mesh.position.z += (player.targetPosition.z - player.mesh.position.z) * t;
+        if (player.mesh !== playerMesh) {
+            if (player.targetPosition) {
+                const t = Math.min((Date.now() - player.lastUpdate) / 100, 1);
+                player.mesh.position.x += (player.targetPosition.x - player.mesh.position.x) * t;
+                player.mesh.position.y += (player.targetPosition.y - player.mesh.position.y) * t;
+                player.mesh.position.z += (player.targetPosition.z - player.mesh.position.z) * t;
+            }
+            
+            if (player.targetRotation !== undefined) {
+                // Increased interpolation speed for rotations (from 100ms to 50ms)
+                const t = Math.min((Date.now() - player.lastRotationUpdate) / 50, 1);
+                // Interpolación suave de la rotación
+                const currentRotation = player.mesh.rotation.y;
+                let targetRotation = player.targetRotation;
+                
+                // Manejar la transición entre 0 y 2π (evitar giros largos)
+                const diff = targetRotation - currentRotation;
+                if (diff > Math.PI) targetRotation -= Math.PI * 2;
+                if (diff < -Math.PI) targetRotation += Math.PI * 2;
+                
+                // Faster rotation interpolation with higher factor
+                player.mesh.rotation.y += (targetRotation - player.mesh.rotation.y) * (t * 1.5);
+            }
         }
     });
 }

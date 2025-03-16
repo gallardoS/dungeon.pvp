@@ -49,7 +49,8 @@ def handle_player_select(data):
         'id': request.sid,
         'name': name,
         'type': player_type,
-        'position': {'x': 0, 'y': -4, 'z': 0}
+        'position': {'x': 0, 'y': -4, 'z': 0},
+        'rotation': 0  # Initialize rotation to 0
     }
     emit('players', [{'id': id, **data} for id, data in players.items()], broadcast=True)
 
@@ -58,6 +59,12 @@ def handle_player_move(position):
     if request.sid in players:
         players[request.sid]['position'] = position
         emit('playerMoved', {'id': request.sid, 'position': position}, broadcast=True)
+
+@socketio.on('playerRotate')
+def handle_player_rotate(rotation):
+    if request.sid in players:
+        players[request.sid]['rotation'] = rotation
+        emit('playerRotated', {'id': request.sid, 'rotation': rotation}, broadcast=True)
 
 @socketio.on('kickPlayer')
 def handle_kick_player(data):
