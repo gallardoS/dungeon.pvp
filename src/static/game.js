@@ -30,7 +30,8 @@ function init() {
     scene.background = new THREE.Color(0x808080);
 
     camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-    camera.position.set(0, 2, 5);
+    camera.position.set(0, 8, 12);
+    camera.lookAt(new THREE.Vector3(0, 3, 0));
 
     renderer = new THREE.WebGLRenderer();
     renderer.setSize(window.innerWidth, window.innerHeight);
@@ -168,9 +169,13 @@ function initSocket() {
                 const nameSprite = createPlayerName(player.name);
                 mesh.add(nameSprite);
                 
+                const directionalTriangle = createDirectionalTriangle();
+                mesh.add(directionalTriangle);
+                
                 players[player.id] = {
                     mesh: mesh,
                     nameSprite: nameSprite,
+                    directionalTriangle: directionalTriangle,
                     type: player.type,
                     name: player.name,
                     lastUpdate: Date.now(),
@@ -451,37 +456,17 @@ function onWindowResize() {
 
 function animate() {
     requestAnimationFrame(animate);
-    updateMovement();
-    applyPhysics();
     
     if (playerMesh) {
-
-        const cameraOffset = new THREE.Vector3(0, 3, 5);
-        cameraOffset.applyAxisAngle(new THREE.Vector3(0, 1, 0), playerRotation);
-        
-        camera.position.x = playerMesh.position.x + cameraOffset.x;
-        camera.position.y = playerMesh.position.y + cameraOffset.y;
-        camera.position.z = playerMesh.position.z + cameraOffset.z;
-
-        camera.lookAt(
-            playerMesh.position.x,
-            playerMesh.position.y + 1, 
-            playerMesh.position.z
-        );
-       
-        document.getElementById('playerPosition').textContent = 
-            `x: ${playerMesh.position.x.toFixed(2)}, y: ${playerMesh.position.y.toFixed(2)}, z: ${playerMesh.position.z.toFixed(2)}`;
-        document.getElementById('playerJumping').textContent = isJumping;
-        document.getElementById('playerRotation').textContent = 
-            `${(playerRotation * 180 / Math.PI).toFixed(2)}°`;
+        const playerPosition = playerMesh.position;
+        const offset = new THREE.Vector3(0, 21, 5);
+        offset.applyQuaternion(playerMesh.quaternion);
+        camera.position.copy(playerPosition).add(offset);
+        camera.lookAt(playerPosition.clone().add(new THREE.Vector3(0, 3, 0)));
     }
-
-    Object.values(players).forEach(player => {
-        if (player.nameSprite) {
-            player.nameSprite.lookAt(camera.position);
-        }
-    });
-
+    
+    updateMovement();
+    applyPhysics();
     renderer.render(scene, camera);
 }
 
@@ -504,6 +489,20 @@ function showChat() {
     });
     
     resetChatFadeTimer();
+}
+
+function createDirectionalTriangle() {
+    const geometry = new THREE.ConeGeometry(0.5, 2, 3);
+    const material = new THREE.MeshBasicMaterial({ 
+        color: 0xFF3333,
+        transparent: true,
+        opacity: 0.8
+    });
+    const cone = new THREE.Mesh(geometry, material);
+    cone.rotation.x = Math.PI/2;
+    cone.rotation.z = Math.PI;
+    cone.position.z = -1.5;
+    return cone;
 }
 
 window.updateGameSettings = updateGameSettings;
