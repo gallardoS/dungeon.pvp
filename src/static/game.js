@@ -11,7 +11,7 @@ let lastMouseX = 0;
 let playerRotation = 0;
 let mouseSensitivity = 0.002;
 let isRotating = false;
-let lastRotationUpdate = 0; // Track when we last sent a rotation update
+let lastRotationUpdate = 0; 
 
 const keys = {
     w: false,
@@ -44,12 +44,10 @@ function init() {
     document.addEventListener('keydown', handleKeyDown);
     document.addEventListener('keyup', handleKeyUp);
     
-    // Eventos para controlar la rotación con el ratón sin bloquearlo
     renderer.domElement.addEventListener('mousedown', handleMouseDown);
     document.addEventListener('mouseup', handleMouseUp);
     document.addEventListener('mousemove', handleMouseMove);
     
-    // Prevenir el menú contextual al hacer clic derecho
     renderer.domElement.addEventListener('contextmenu', function(event) {
         event.preventDefault();
     });
@@ -58,7 +56,6 @@ function init() {
 }
 
 function handleMouseDown(event) {
-    // Solo activar la rotación con el botón derecho (event.button === 2)
     if (event.button === 2) {
         isRotating = true;
         lastMouseX = event.clientX;
@@ -66,7 +63,6 @@ function handleMouseDown(event) {
 }
 
 function handleMouseUp(event) {
-    // Solo desactivar la rotación si se suelta el botón derecho
     if (event.button === 2) {
         isRotating = false;
     }
@@ -74,15 +70,13 @@ function handleMouseUp(event) {
 
 function handleMouseMove(event) {
     if (isRotating) {
-        // Calcular el movimiento horizontal del ratón
         const deltaX = event.clientX - lastMouseX;
         playerRotation -= deltaX * mouseSensitivity;
         lastMouseX = event.clientX;
         
-        // Enviar la rotación al servidor (limitar la frecuencia de envío)
         const now = Date.now();
-        if (now - lastRotationUpdate > 30) { // Increased frequency from 50ms to 30ms
-            socket.emit('playerRotate', playerRotation); // Changed from volatile.emit to emit for more reliability
+        if (now - lastRotationUpdate > 30) { 
+            socket.emit('playerRotate', playerRotation);
             lastRotationUpdate = now;
         }
     }
@@ -234,7 +228,6 @@ function addChatMessage(sender, message, timestamp) {
     chatMessages.appendChild(messageElement);
     chatMessages.scrollTop = chatMessages.scrollHeight;
     
-    // Limitar el número de mensajes (mantener los últimos 50)
     while (chatMessages.children.length > 50) {
         chatMessages.removeChild(chatMessages.firstChild);
     }
@@ -291,10 +284,8 @@ function updateMovement() {
     let moved = false;
     const movement = { x: 0, z: 0 };
     
-    // Crear un vector de dirección basado en la rotación del personaje
     const direction = new THREE.Vector3();
     
-    // Movimiento relativo a la dirección del personaje
     if (keys.w) {
         direction.z = -1;
     }
@@ -308,11 +299,9 @@ function updateMovement() {
         direction.x = 1;
     }
     
-    // Normalizar el vector si se mueve en diagonal
     if (direction.length() > 0) {
         direction.normalize();
         
-        // Aplicar la rotación del personaje al movimiento
         direction.applyAxisAngle(new THREE.Vector3(0, 1, 0), playerRotation);
         
         movement.x = direction.x * moveSpeed;
@@ -332,7 +321,6 @@ function updateMovement() {
         moved = true;
     }
     
-    // Actualizar la rotación del personaje
     playerMesh.rotation.y = playerRotation;
 
     if (moved) {
@@ -353,18 +341,17 @@ function updateMovement() {
             }
             
             if (player.targetRotation !== undefined) {
-                // Increased interpolation speed for rotations (from 100ms to 50ms)
+           
                 const t = Math.min((Date.now() - player.lastRotationUpdate) / 50, 1);
-                // Interpolación suave de la rotación
+               
                 const currentRotation = player.mesh.rotation.y;
                 let targetRotation = player.targetRotation;
                 
-                // Manejar la transición entre 0 y 2π (evitar giros largos)
                 const diff = targetRotation - currentRotation;
                 if (diff > Math.PI) targetRotation -= Math.PI * 2;
                 if (diff < -Math.PI) targetRotation += Math.PI * 2;
                 
-                // Faster rotation interpolation with higher factor
+                
                 player.mesh.rotation.y += (targetRotation - player.mesh.rotation.y) * (t * 1.5);
             }
         }
@@ -402,18 +389,17 @@ function animate() {
     applyPhysics();
     
     if (playerMesh) {
-        // Posicionar la cámara detrás del personaje basado en su rotación
+
         const cameraOffset = new THREE.Vector3(0, 3, 5);
         cameraOffset.applyAxisAngle(new THREE.Vector3(0, 1, 0), playerRotation);
         
         camera.position.x = playerMesh.position.x + cameraOffset.x;
         camera.position.y = playerMesh.position.y + cameraOffset.y;
         camera.position.z = playerMesh.position.z + cameraOffset.z;
-        
-        // Hacer que la cámara mire al personaje
+
         camera.lookAt(
             playerMesh.position.x,
-            playerMesh.position.y + 1, // Mirar un poco por encima del centro del jugador
+            playerMesh.position.y + 1, 
             playerMesh.position.z
         );
        

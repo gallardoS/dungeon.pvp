@@ -28,9 +28,25 @@
             padding: 5px;
             z-index: 1000;
         }
-        #debugPanel {
+        #debugToggle {
             position: fixed;
             top: 10px;
+            right: 10px;
+            color: white;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 10px 15px;
+            border-radius: 10px;
+            z-index: 1001;
+            cursor: pointer;
+            font-family: Arial, sans-serif;
+            border: 1px solid #444;
+        }
+        #debugToggle:hover {
+            background: rgba(0, 0, 0, 0.9);
+        }
+        #debugPanel {
+            position: fixed;
+            top: 50px;
             right: 10px;
             color: white;
             background: rgba(0, 0, 0, 0.8);
@@ -39,6 +55,14 @@
             z-index: 1000;
             min-width: 250px;
             font-family: Arial, sans-serif;
+            transition: transform 0.3s ease, opacity 0.3s ease;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+        #debugPanel.collapsed {
+            transform: translateY(-100%);
+            opacity: 0;
+            pointer-events: none;
         }
         .debug-info {
             margin-bottom: 15px;
@@ -209,7 +233,10 @@
         </div>
     </div>
     <div id="debug">Connection status: Disconnected</div>
-    <div id="debugPanel" class="hidden">
+    
+    <button id="debugToggle" class="hidden">DEBUG CONTROLS</button>
+    
+    <div id="debugPanel" class="hidden collapsed">
         <h3>Debug Controls</h3>
         <div class="debug-control">
             <label for="moveSpeed">Move Speed: <span id="moveSpeedValue">0.1</span></label>
@@ -269,7 +296,7 @@
 
         function selectCharacter(type) {
             document.getElementById('ui').classList.add('hidden');
-            document.getElementById('debugPanel').classList.remove('hidden');
+            document.getElementById('debugToggle').classList.remove('hidden');
             document.getElementById('chatContainer').classList.remove('hidden');
             window.playerType = type;
             socket.emit('playerSelect', {
@@ -277,13 +304,24 @@
                 type: type
             });
             
-            // Configurar eventos del chat
             document.getElementById('sendButton').addEventListener('click', sendChatMessage);
             document.getElementById('messageInput').addEventListener('keypress', function(e) {
                 if (e.key === 'Enter') {
                     sendChatMessage();
                 }
             });
+            
+            document.getElementById('debugToggle').addEventListener('click', toggleDebugPanel);
+        }
+        
+        function toggleDebugPanel() {
+            const panel = document.getElementById('debugPanel');
+            if (panel.classList.contains('collapsed')) {
+                panel.classList.remove('collapsed');
+                panel.classList.remove('hidden');
+            } else {
+                panel.classList.add('collapsed');
+            }
         }
 
         document.getElementById('playerName').addEventListener('keypress', function(e) {
