@@ -269,11 +269,14 @@ function interpolatePlayerPositions() {
             let targetRotation = player.targetRotation;
             
             // Handle rotation wrapping for shortest path
-            const diff = targetRotation - currentRotation;
-            if (diff > Math.PI) targetRotation -= Math.PI * 2;
-            if (diff < -Math.PI) targetRotation += Math.PI * 2;
+            let diff = targetRotation - currentRotation;
             
-            player.mesh.rotation.y += (targetRotation - player.mesh.rotation.y) * (t * 1.5);
+            // Normalize difference to range [-PI, PI]
+            while (diff > Math.PI) diff -= Math.PI * 2;
+            while (diff < -Math.PI) diff += Math.PI * 2;
+            
+            // Apply smooth interpolation
+            player.mesh.rotation.y += diff * (t * 0.5);
         }
         
         // Keep player names facing the camera

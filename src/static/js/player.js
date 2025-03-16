@@ -1,108 +1,116 @@
 /**
  * player.js - Player module for Dungeon PvP
- * Handles player creation, movement, physics and controls
+ * Handles player creation, movement and updates
  */
+
+// Import THREE.js
+import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.132.2/build/three.module.js';
 
 // Import scene variables
 import { scene, camera, renderer, floorY, updateCameraPosition } from './scene.js';
 
-// Player state variables
-let playerMesh;
-let velocity = 0;
-let isJumping = false;
-let gravity = -0.015;
-let moveSpeed = 0.1;
-let jumpForce = 0.3;
-let playerRotation = 0;
-let mouseSensitivity = 0.002;
-let lastRotationUpdate = 0;
-let socket;
+// Import input module
+import { keys } from './input.js';
 
-// Keyboard state
-const keys = {
-    w: false,
-    s: false,
-    a: false,
-    d: false,
-    ' ': false
+// Player variables
+let playerMesh = null;
+let playerVelocity = new THREE.Vector3();
+let playerOnGround = true;
+let socket = null;
+
+// Game settings
+let settings = {
+    moveSpeed: 0.1,
+    jumpForce: 0.3,
+    gravity: -0.015,
+    mouseSensitivity: 0.002
 };
 
 /**
- * Initialize player controls
- * @param {Function} isChatInputFocused - Function to check if chat input is focused
+ * Set the socket instance for player communication
+ * @param {Object} socketInstance - Socket.io instance
  */
-function initPlayerControls(isChatInputFocused) {
-    // Set up event listeners for player controls
-    document.addEventListener('keydown', (event) => handleKeyDown(event, isChatInputFocused));
-    document.addEventListener('keyup', handleKeyUp);
-    document.addEventListener('mousemove', (event) => handleMouseMove(event, isChatInputFocused));
+function setSocket(socketInstance) {
+    socket = socketInstance;
 }
 
 /**
- * Handle mouse movement for player rotation
- * @param {Event} event - Mouse move event
- * @param {Function} isChatInputFocused - Function to check if chat input is focused
+ * Update game settings
+ * @param {Object} newSettings - New settings object
  */
-function handleMouseMove(event, isChatInputFocused) {
-    if (isChatInputFocused()) return;
+function updateGameSettings(newSettings) {
+    settings = { ...settings, ...newSettings };
+}
+
+/**
+ * Update player position and rotation
+ */
+function updatePlayer() {
+    if (!playerMesh) return;
     
-    if (playerMesh) {
-        // Usar el método de raycasting para determinar la dirección de rotación
-        const rect = renderer.domElement.getBoundingClientRect();
-        const mouseX = event.clientX - rect.left;
-        const mouseY = event.clientY - rect.top;
-        
-        // Convertir posición del mouse a coordenadas normalizadas (-1 a +1)
-        const ndcX = (mouseX / rect.width) * 2 - 1;
-        const ndcY = -(mouseY / rect.height) * 2 + 1;
-        
-        // Crear un rayo desde la cámara a través de la posición del mouse
-        const raycaster = new THREE.Raycaster();
-        raycaster.setFromCamera(new THREE.Vector2(ndcX, ndcY), camera);
-        
-        // Obtener el punto donde el rayo intersecta con el plano del suelo
-        const groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -floorY);
-        const targetPoint = new THREE.Vector3();
-        raycaster.ray.intersectPlane(groundPlane, targetPoint);
-        
-        // Calcular el ángulo entre la posición del jugador y el punto objetivo
-        const dx = targetPoint.x - playerMesh.position.x;
-        const dz = targetPoint.z - playerMesh.position.z;
-        playerRotation = Math.atan2(dx, dz);
-        
-        // Emitir actualización de rotación al servidor (limitada)
-        const now = Date.now();
-        if (now - lastRotationUpdate > 50) { // Limitar a 20 actualizaciones por segundo
-            lastRotationUpdate = now;
-            socket.volatile.emit('playerRotate', playerRotation);
-        }
+    // Update player movement based on key states
+    const moveSpeed = settings.moveSpeed;
+    
+    // Reset velocity
+    playerVelocity.x = 0;
+    playerVelocity.z = 0;
+    
+    // Apply movement based on key states (topdown shooter style)
+    if (keys.forward) {
+        playerVelocity.z -= moveSpeed;
     }
-}
-
-/**
- * Handle key down events
- * @param {Event} event - Key event
- * @param {Function} isChatInputFocused - Function to check if chat input is focused
- */
-function handleKeyDown(event, isChatInputFocused) {
-    if (isChatInputFocused() && ['w', 'a', 's', 'd', ' '].includes(event.key.toLowerCase())) {
-        return;
+    if (keys.backward) {
+        playerVelocity.z += moveSpeed;
+    }
+    if (keys.left) {
+        playerVelocity.x -= moveSpeed;
+    }
+    if (keys.right) {
+        playerVelocity.x += moveSpeed;
     }
     
-    const key = event.key.toLowerCase();
-    if (key in keys) {
-        keys[key] = true;
+    // Apply jump if on ground
+    if (keys.jump && playerOnGround) {
+        playerVelocity.y = settings.jumpForce;
+        playerOnGround = false;
     }
-}
-
-/**
- * Handle key up events
- * @param {Event} event - Key event
- */
-function handleKeyUp(event) {
-    const key = event.key.toLowerCase();
-    if (key in keys) {
-        keys[key] = false;
+    
+    // Apply gravity
+    if (!playerOnGround) {
+        playerVelocity.y += settings.gravity;
+    }
+    
+    // Apply movement directly without rotation transformation (topdown shooter style)
+    playerMesh.position.x += playerVelocity.x;
+    playerMesh.position.y += playerVelocity.y;
+    playerMesh.position.z += playerVelocity.z;
+    
+    // Check if player is on ground
+    if (playerMesh.position.y <= floorY) {
+        playerMesh.position.y = floorY;
+        playerVelocity.y = 0;
+        playerOnGround = true;
+    }
+    
+    // Emit position update to server
+    socket.volatile.emit('playerMove', {
+        x: playerMesh.position.x,
+        y: playerMesh.position.y,
+        z: playerMesh.position.z
+    });
+    
+    // Update camera position to follow player
+    updateCameraPosition(playerMesh);
+    
+    // Update name sprite rotation to always face camera
+    const nameContainer = playerMesh.children.find(child => 
+        child instanceof THREE.Object3D && 
+        child.children.length > 0 && 
+        child.children[0] instanceof THREE.Sprite
+    );
+    
+    if (nameContainer) {
+        nameContainer.rotation.y = -playerMesh.rotation.y;
     }
 }
 
@@ -172,99 +180,8 @@ function createDirectionalTriangle() {
 }
 
 /**
- * Update player movement based on keyboard input
- * @param {Function} isChatInputFocused - Function to check if chat input is focused
- */
-function updateMovement(isChatInputFocused) {
-    if (!playerMesh) return;
-    
-    if (isChatInputFocused()) return;
-
-    let moved = false;
-    const movement = { x: 0, z: 0 };
-    
-    if (keys.w) {
-        movement.z = -moveSpeed; // Move north
-    }
-    if (keys.s) {
-        movement.z = moveSpeed;  // Move south
-    }
-    if (keys.a) {
-        movement.x = -moveSpeed; // Move west
-    }
-    if (keys.d) {
-        movement.x = moveSpeed;  // Move east
-    }
-    
-    if (movement.x !== 0 || movement.z !== 0) {
-        // Apply movement directly without rotation transformation
-        playerMesh.position.x = Math.max(Math.min(playerMesh.position.x + movement.x, 10), -10);
-        playerMesh.position.z = Math.max(Math.min(playerMesh.position.z + movement.z, 10), -10);
-        moved = true;
-    }
-
-    if (keys[' '] && !isJumping) {
-        velocity = jumpForce;
-        isJumping = true;
-        moved = true;
-    }
-
-    // Update rotation to face mouse cursor
-    playerMesh.rotation.y = playerRotation;
-    
-    if (moved) {
-        socket.volatile.emit('playerMove', {
-            x: playerMesh.position.x,
-            y: playerMesh.position.y,
-            z: playerMesh.position.z
-        });
-    }
-}
-
-/**
- * Apply physics to the player (gravity, jumping)
- */
-function applyPhysics() {
-    if (playerMesh) {
-        if (playerMesh.position.y > floorY) {
-            velocity += gravity;
-            playerMesh.position.y += velocity;
-            if (playerMesh.position.y < floorY) {
-                playerMesh.position.y = floorY;
-                velocity = 0;
-                isJumping = false;
-            }
-            socket.emit('playerMove', {
-                x: playerMesh.position.x,
-                y: playerMesh.position.y,
-                z: playerMesh.position.z
-            });
-        }
-    }
-}
-
-/**
- * Update game settings
- * @param {Object} settings - Game settings to update
- */
-function updateGameSettings(settings) {
-    if (settings.moveSpeed !== undefined) moveSpeed = settings.moveSpeed;
-    if (settings.jumpForce !== undefined) jumpForce = settings.jumpForce;
-    if (settings.gravity !== undefined) gravity = settings.gravity;
-    if (settings.mouseSensitivity !== undefined) mouseSensitivity = settings.mouseSensitivity;
-}
-
-/**
- * Set the socket instance for player communication
- * @param {Object} socketInstance - Socket.io instance
- */
-function setSocket(socketInstance) {
-    socket = socketInstance;
-}
-
-/**
- * Get the current player mesh
- * @returns {THREE.Mesh} - Current player mesh
+ * Get player mesh
+ * @returns {THREE.Mesh} - Player mesh
  */
 function getPlayerMesh() {
     return playerMesh;
@@ -293,7 +210,6 @@ function createMainPlayer(playerData) {
     // Set rotation
     if (playerData.rotation !== undefined) {
         mesh.rotation.y = playerData.rotation;
-        playerRotation = playerData.rotation;
     }
     
     // Add to scene
@@ -315,36 +231,11 @@ function createMainPlayer(playerData) {
     return mesh;
 }
 
-/**
- * Update player in game loop
- * @param {Function} isChatInputFocused - Function to check if chat input is focused
- */
-function updatePlayer(isChatInputFocused) {
-    updateMovement(isChatInputFocused);
-    applyPhysics();
-    
-    if (playerMesh) {
-        updateCameraPosition(playerMesh);
-        
-        // Update name sprite rotation to always face camera
-        const nameContainer = playerMesh.children.find(child => child instanceof THREE.Object3D && child.children.length > 0 && child.children[0] instanceof THREE.Sprite);
-        if (nameContainer) {
-            nameContainer.rotation.y = -playerMesh.rotation.y;
-        }
-    }
-}
-
-// Export player module functions
+// Export player module
 export {
-    initPlayerControls,
-    createCharacterMesh,
-    createPlayerName,
-    createDirectionalTriangle,
-    updateMovement,
-    applyPhysics,
-    updateGameSettings,
     setSocket,
+    updatePlayer,
     getPlayerMesh,
     createMainPlayer,
-    updatePlayer
+    updateGameSettings
 };

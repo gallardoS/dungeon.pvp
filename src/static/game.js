@@ -4,7 +4,6 @@ import { initChat, addChatMessage, sendChatMessage, isChatInputFocused } from '.
 import { scene, camera, renderer, floorY, initScene, animate } from './js/scene.js';
 // Import player module
 import { 
-    initPlayerControls, 
     updatePlayer, 
     setSocket as setPlayerSocket, 
     getPlayerMesh,
@@ -21,6 +20,13 @@ import {
     getPlayers,
     hasPlayer
 } from './js/playersManager.js';
+// Import input module
+import {
+    keys,
+    setupInput,
+    cleanupInput,
+    setPlayerMesh
+} from './js/input.js';
 
 let socket;
 
@@ -28,39 +34,39 @@ function init() {
     // Initialize scene, camera and renderer
     initScene();
     
-    // Initialize player controls
-    initPlayerControls(isChatInputFocused);
+    // Initialize socket connection
+    initSocket();
     
     // Start the animation loop with our update function
     animate(updateGame);
-    
-    // Initialize socket connection
-    initSocket();
 }
 
 function updateGame() {
-    // Update player position, physics, and camera
-    updatePlayer(isChatInputFocused);
+    // Update player position and rotation
+    updatePlayer();
     
     // Interpolate other players' positions
     interpolatePlayerPositions();
 }
 
 function initSocket() {
-    socket = io({
-        transports: ['websocket'],
-        upgrade: false,
-        reconnection: true,
-        reconnectionDelay: 1000,
-        reconnectionDelayMax: 5000
-    });
-
+    socket = io();
+    
+    // Set socket in player and players manager modules
+    setPlayerSocket(socket);
+    setPlayersManagerSocket(socket);
+    
+    // Socket connection event
     socket.on('connect', () => {
-        document.getElementById('debug').textContent = 'Connected';
+        document.getElementById('debug').textContent = 'Connection status: Connected';
+        
+        // Initialize chat
+        initChat(socket, addChatMessage);
     });
-
+    
+    // Socket disconnection event
     socket.on('disconnect', () => {
-        document.getElementById('debug').textContent = 'Disconnected';
+        document.getElementById('debug').textContent = 'Connection status: Disconnected';
     });
 
     socket.on('players', playerList => {
@@ -74,7 +80,10 @@ function initSocket() {
             // Check if we need to create the main player
             if (!getPlayerMesh()) {
                 console.log('Creating main player');
-                createMainPlayer(currentPlayer);
+                const playerMesh = createMainPlayer(currentPlayer);
+                
+                // Initialize input controls with the player mesh
+                setupInput(playerMesh, socket, isChatInputFocused);
             }
             
             // Show admin panel if player is admin
@@ -97,16 +106,19 @@ function initSocket() {
         console.log('Player rotated:', data.id);
         updatePlayerRotation(data, socket.id);
     });
-
+    
+    socket.on('chatMessage', data => {
+        addChatMessage(data);
+    });
+    
+    socket.on('playerDisconnected', playerId => {
+        console.log('Player disconnected:', playerId);
+    });
+    
     socket.on('kicked', () => {
         alert('You have been kicked from the server');
         window.location.reload();
     });
-
-    // Initialize chat module with socket instance
-    initChat(socket);
-    setPlayerSocket(socket);
-    setPlayersManagerSocket(socket);
 }
 
 function updateAdminPlayerList(playerList) {
@@ -114,15 +126,21 @@ function updateAdminPlayerList(playerList) {
     playerListElement.innerHTML = '';
     
     playerList.forEach(player => {
-        if (player.id !== socket.id) {
-            const li = document.createElement('li');
-            li.className = 'player-item';
-            li.innerHTML = `
-                <span>${player.name} (${player.type})</span>
-                <button class="kick-button" onclick="kickPlayer('${player.id}')">Kick</button>
-            `;
-            playerListElement.appendChild(li);
-        }
+        const playerItem = document.createElement('li');
+        playerItem.className = 'player-item';
+        playerItem.innerHTML = `
+            <span>${player.name} (${player.type})</span>
+            <button class="kick-button" data-player-id="${player.id}">Kick</button>
+        `;
+        playerListElement.appendChild(playerItem);
+    });
+    
+    // Agregar event listeners a los botones de kick
+    document.querySelectorAll('.kick-button').forEach(button => {
+        button.addEventListener('click', function() {
+            const playerId = this.getAttribute('data-player-id');
+            kickPlayer(playerId);
+        });
     });
 }
 
@@ -130,26 +148,7 @@ function kickPlayer(playerId) {
     socket.emit('kickPlayer', { id: playerId });
 }
 
-function handleKeyDown(event) {
-    if (isChatInputFocused() && ['w', 'a', 's', 'd', ' '].includes(event.key.toLowerCase())) {
-        return;
-    }
-    
-    const key = event.key.toLowerCase();
-    if (key in keys) {
-        keys[key] = true;
-    }
-}
-
-function handleKeyUp(event) {
-    const key = event.key.toLowerCase();
-    if (key in keys) {
-        keys[key] = false;
-    }
-}
-
 function updateGameSettings(settings) {
-    // Pass settings to player module
     updatePlayerSettings(settings);
 }
 
@@ -157,7 +156,7 @@ function updateGameSettings(settings) {
 window.updateGameSettings = updateGameSettings;
 window.sendChatMessage = sendChatMessage;
 window.init = init;
-window.initSocket = initSocket;
+
 window.selectCharacter = function(type) {
     document.getElementById('ui').classList.add('hidden');
     document.getElementById('debugToggle').classList.remove('hidden');
@@ -195,8 +194,7 @@ function toggleDebugPanel() {
 }
 
 window.validateName = function() {
-    const nameInput = document.getElementById('playerName');
-    const name = nameInput.value.trim();
+    const name = document.getElementById('playerName').value.trim();
     const errorElement = document.getElementById('nameError');
     
     if (name.length < 3) {

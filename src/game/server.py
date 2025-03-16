@@ -57,14 +57,20 @@ def handle_player_select(data):
 @socketio.on('playerMove')
 def handle_player_move(position):
     if request.sid in players:
-        players[request.sid]['position'] = position
-        emit('playerMoved', {'id': request.sid, 'position': position}, broadcast=True)
+        if 'x' in position and 'y' in position and 'z' in position:
+            players[request.sid]['position'] = position
+            emit('playerMoved', {'id': request.sid, 'position': position}, broadcast=True)
+        else:
+            print("Invalid position data")
 
 @socketio.on('playerRotate')
 def handle_player_rotate(rotation):
     if request.sid in players:
-        players[request.sid]['rotation'] = rotation
-        emit('playerRotated', {'id': request.sid, 'rotation': rotation}, broadcast=True)
+        if isinstance(rotation, (int, float)):
+            players[request.sid]['rotation'] = rotation
+            emit('playerRotated', {'id': request.sid, 'rotation': rotation}, broadcast=True)
+        else:
+            print("Invalid rotation data")
 
 @socketio.on('kickPlayer')
 def handle_kick_player(data):
