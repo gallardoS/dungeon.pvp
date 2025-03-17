@@ -1,8 +1,5 @@
-// Import chat module
 import { initChat, addChatMessage, sendChatMessage, isChatInputFocused } from './js/chat.js';
-// Import scene module
 import { scene, camera, renderer, floorY, initScene, animate } from './js/scene.js';
-// Import player module
 import { 
     updatePlayer, 
     setSocket as setPlayerSocket, 
@@ -10,7 +7,6 @@ import {
     createMainPlayer,
     updateGameSettings as updatePlayerSettings
 } from './js/player.js';
-// Import players manager module
 import {
     setSocket as setPlayersManagerSocket,
     processPlayerList,
@@ -20,7 +16,6 @@ import {
     getPlayers,
     hasPlayer
 } from './js/playersManager.js';
-// Import input module
 import {
     keys,
     setupInput,
@@ -31,40 +26,31 @@ import {
 let socket;
 
 function init() {
-    // Initialize scene, camera and renderer
     initScene();
     
-    // Initialize socket connection
     initSocket();
     
-    // Start the animation loop with our update function
     animate(updateGame);
 }
 
 function updateGame() {
-    // Update player position and rotation
     updatePlayer();
     
-    // Interpolate other players' positions
     interpolatePlayerPositions();
 }
 
 function initSocket() {
     socket = io();
-    
-    // Set socket in player and players manager modules
+
     setPlayerSocket(socket);
     setPlayersManagerSocket(socket);
     
-    // Socket connection event
     socket.on('connect', () => {
         document.getElementById('debug').textContent = 'Connection status: Connected';
         
-        // Initialize chat
-        initChat(socket, addChatMessage);
+        initChat(socket);
     });
     
-    // Socket disconnection event
     socket.on('disconnect', () => {
         document.getElementById('debug').textContent = 'Connection status: Disconnected';
     });
@@ -72,28 +58,23 @@ function initSocket() {
     socket.on('players', playerList => {
         console.log('Received player list:', playerList);
         
-        // Check for current player and create/update if needed
         const currentPlayer = playerList.find(p => p.id === socket.id);
         if (currentPlayer) {
             console.log('Found current player in list:', currentPlayer);
             
-            // Check if we need to create the main player
             if (!getPlayerMesh()) {
                 console.log('Creating main player');
                 const playerMesh = createMainPlayer(currentPlayer);
                 
-                // Initialize input controls with the player mesh
                 setupInput(playerMesh, socket, isChatInputFocused);
             }
             
-            // Show admin panel if player is admin
             if (currentPlayer.name === 'swami') {
                 document.getElementById('adminPanel').classList.remove('hidden');
                 updateAdminPlayerList(playerList);
             }
         }
         
-        // Process all other players
         processPlayerList(playerList, socket.id);
     });
 
@@ -106,11 +87,7 @@ function initSocket() {
         console.log('Player rotated:', data.id);
         updatePlayerRotation(data, socket.id);
     });
-    
-    socket.on('chatMessage', data => {
-        addChatMessage(data);
-    });
-    
+        
     socket.on('playerDisconnected', playerId => {
         console.log('Player disconnected:', playerId);
     });
@@ -135,7 +112,6 @@ function updateAdminPlayerList(playerList) {
         playerListElement.appendChild(playerItem);
     });
     
-    // Agregar event listeners a los botones de kick
     document.querySelectorAll('.kick-button').forEach(button => {
         button.addEventListener('click', function() {
             const playerId = this.getAttribute('data-player-id');
@@ -152,7 +128,6 @@ function updateGameSettings(settings) {
     updatePlayerSettings(settings);
 }
 
-// Export functions for use in HTML
 window.updateGameSettings = updateGameSettings;
 window.sendChatMessage = sendChatMessage;
 window.init = init;
@@ -163,17 +138,11 @@ window.selectCharacter = function(type) {
     document.getElementById('chatContainer').classList.remove('hidden');
     window.playerType = type;
     
-    // Emit player selection to server
     socket.emit('playerSelect', {
         name: window.playerName,
         type: type
     });
     
-    // Create main player with initial data
-    // Note: We don't create the player here anymore, we'll wait for the server to send it back
-    // This ensures consistency between client and server
-    
-    // Add event listeners for chat buttons
     document.getElementById('sendButton').addEventListener('click', sendChatMessage);
     document.getElementById('messageInput').addEventListener('keypress', function(e) {
         if (e.key === 'Enter') {
@@ -181,7 +150,6 @@ window.selectCharacter = function(type) {
         }
     });
     
-    // Add event listener for debug toggle
     document.getElementById('debugToggle').addEventListener('click', toggleDebugPanel);
 };
 
@@ -212,7 +180,6 @@ window.validateName = function() {
     }
 };
 
-// Initialize the game when the module is loaded
 document.addEventListener('DOMContentLoaded', () => {
     init();
 });

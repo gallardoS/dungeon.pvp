@@ -3,7 +3,6 @@
  * Handles all chat-related functionality including UI interaction and WebSocket communication
  */
 
-// Chat state variables
 let lastChatTime = Date.now();
 let chatFadeTimer = null;
 let isChatFocused = false;
@@ -14,15 +13,12 @@ let socket = null;
  * @param {Object} socketInstance - The socket.io instance to use for communication
  */
 function initChat(socketInstance) {
-    // Store socket reference
     socket = socketInstance;
     
-    // Set up chat message listener
     socket.on('chatMessage', (data) => {
         addChatMessage(data.sender, data.message, data.timestamp);
     });
 
-    // Set up DOM event listeners
     const messageInput = document.getElementById('messageInput');
     messageInput.addEventListener('focus', () => {
         isChatFocused = true;
@@ -41,7 +37,6 @@ function initChat(socketInstance) {
         resetChatFadeTimer();
     });
 
-    // Set up send button and Enter key event listeners
     document.getElementById('sendButton').addEventListener('click', sendChatMessage);
     messageInput.addEventListener('keypress', (e) => {
         if (e.key === 'Enter') {
@@ -73,14 +68,12 @@ function addChatMessage(sender, message, timestamp) {
     chatMessages.appendChild(messageElement);
     chatMessages.scrollTop = chatMessages.scrollHeight;
     
-    // Limit the number of messages to 50
     while (chatMessages.children.length > 50) {
         chatMessages.removeChild(chatMessages.firstChild);
     }
     
     lastChatTime = Date.now();
     
-    // Remove fading class from all messages
     document.querySelectorAll('.chat-message').forEach(msg => {
         msg.classList.remove('fading');
     });
@@ -156,7 +149,6 @@ function isChatInputFocused() {
     return isChatFocused;
 }
 
-// Export public functions and variables
 export {
     initChat,
     addChatMessage,
