@@ -1,5 +1,5 @@
 import { initChat, addChatMessage, sendChatMessage, isChatInputFocused } from './js/chat.js';
-import { scene, camera, renderer, floorY, initScene, animate } from './js/scene.js';
+import { scene, camera, renderer, floorY, initScene, animate, toggleStats } from './js/scene.js';
 import { 
     updatePlayer, 
     setSocket as setPlayerSocket, 
@@ -129,6 +129,7 @@ function updateGameSettings(settings) {
 window.updateGameSettings = updateGameSettings;
 window.sendChatMessage = sendChatMessage;
 window.init = init;
+window.toggleStats = toggleStats;
 
 window.selectCharacter = function(type) {
     document.getElementById('ui').classList.add('hidden');

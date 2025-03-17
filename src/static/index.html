@@ -306,6 +306,9 @@
             <label for="mouseSensitivity">Mouse Sensitivity: <span id="mouseSensitivityValue">0.002</span></label>
             <input type="range" id="mouseSensitivity" min="0.001" max="0.01" step="0.001" value="0.002">
         </div>
+        <div class="debug-control">
+            <button id="toggleStats">Show stats</button>
+        </div>
         <div id="playerInfo">
             <h4>Player Info</h4>
             <p>Position: <span id="playerPosition">x: 0, y: 0, z: 0</span></p>
@@ -373,6 +376,19 @@
             const value = parseFloat(e.target.value);
             document.getElementById('mouseSensitivityValue').textContent = value;
             window.updateGameSettings({ mouseSensitivity: value });
+        });
+
+        document.getElementById('toggleStats').addEventListener('click', function() {
+            const button = this;
+            const statsVisible = button.textContent === 'Hide stats';
+            
+            if (statsVisible) {
+                button.textContent = 'Show stats';
+                window.toggleStats(false);
+            } else {
+                button.textContent = 'Hide stats';
+                window.toggleStats(true);
+            }
         });
     </script>
 </body>

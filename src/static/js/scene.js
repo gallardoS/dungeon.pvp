@@ -9,6 +9,9 @@ import { THREE } from './three-module.js';
 // Import cursor module
 import { applyCustomCursor } from './cursor.js';
 
+// Import stats module
+import { initStats, beginStats, endStats, setStatsVisibility } from './stats-module.js';
+
 // Scene variables
 let scene, camera, renderer;
 const floorY = -4;
@@ -22,31 +25,46 @@ function initScene() {
     scene = new THREE.Scene();
     scene.background = new THREE.Color(0x808080);
 
-    // Set up camera
+    // Create perspective camera
     camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-    camera.position.set(0, 8, 12);
-    camera.lookAt(new THREE.Vector3(1, 2, 1));
+    camera.position.set(0, 20, 5);
+    camera.lookAt(0, 0, 0);
 
-    // Set up renderer
-    renderer = new THREE.WebGLRenderer();
+    // Create WebGL renderer with antialiasing
+    renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
     document.body.appendChild(renderer.domElement);
 
-    // Apply custom cursor to renderer
-    applyCustomCursor(renderer.domElement);
-
-    // Create ground plane with black color (as per user preference)
-    const ground = new THREE.Mesh(
-        new THREE.PlaneGeometry(20, 20),
-        new THREE.MeshBasicMaterial({ color: 0x000000 })
-    );
-    ground.rotation.x = -Math.PI / 2;
-    ground.position.y = floorY;
-    scene.add(ground);
-
-    // Set up window resize handler
+    // Add event listener for window resize
     window.addEventListener('resize', onWindowResize, false);
+
+    // Create ambient light
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+    scene.add(ambientLight);
+
+    // Create directional light (sun-like)
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+    directionalLight.position.set(10, 20, 10);
+    scene.add(directionalLight);
+
+    // Create floor
+    const floorGeometry = new THREE.PlaneGeometry(100, 100);
+    const floorMaterial = new THREE.MeshStandardMaterial({ 
+        color: 0x404040,
+        roughness: 0.8,
+        metalness: 0.2
+    });
+    const floor = new THREE.Mesh(floorGeometry, floorMaterial);
+    floor.rotation.x = -Math.PI / 2;
+    floor.position.y = floorY;
+    scene.add(floor);
+
+    // Apply custom cursor
+    applyCustomCursor(renderer.domElement);
     
+    // Initialize stats panels
+    initStats();
+
     return { scene, camera, renderer };
 }
 
@@ -66,6 +84,9 @@ function onWindowResize() {
 function animate(updateCallback) {
     requestAnimationFrame(() => animate(updateCallback));
     
+    // Begin stats measurement
+    beginStats();
+    
     // Call the update callback if provided
     if (updateCallback) {
         updateCallback(scene, camera);
@@ -73,6 +94,9 @@ function animate(updateCallback) {
     
     // Render the scene
     renderer.render(scene, camera);
+    
+    // End stats measurement
+    endStats();
 }
 
 /**
@@ -88,6 +112,14 @@ function updateCameraPosition(target) {
     }
 }
 
+/**
+ * Toggle stats visibility
+ * @param {boolean} visible - Whether stats should be visible
+ */
+function toggleStats(visible) {
+    setStatsVisibility(visible);
+}
+
 // Export scene module
 export {
     scene,
@@ -97,5 +129,6 @@ export {
     initScene,
     onWindowResize,
     animate,
-    updateCameraPosition
+    updateCameraPosition,
+    toggleStats
 };
