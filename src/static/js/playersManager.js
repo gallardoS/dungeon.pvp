@@ -1,13 +1,11 @@
 /**
- * playersManager.js - Players management module for Dungeon PvP
- * Handles creation, updating, removal and interpolation of other connected players
+ * playersManager.js - Players manager module for Dungeon PvP
+ * Handles other connected players creation, updates and management
  */
 
-// Import THREE.js
-import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.132.2/build/three.module.js';
-
-// Import scene variables
+// Import modules
 import { scene, floorY } from './scene.js';
+import { THREE } from './three-module.js';
 
 // Connected players store
 let players = {};
@@ -251,7 +249,6 @@ function processPlayerList(playerList, currentPlayerId) {
  * Interpolate player positions and rotations for smooth movement
  */
 function interpolatePlayerPositions() {
-    console.log('Interpolating positions for', Object.keys(players).length, 'players');
     
     Object.values(players).forEach(player => {
         // Position interpolation

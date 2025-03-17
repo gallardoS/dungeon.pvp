@@ -1,13 +1,11 @@
 /**
- * input.js - Input handling module for Dungeon PvP
- * Handles keyboard and mouse input events
+ * input.js - Input module for Dungeon PvP
+ * Handles keyboard and mouse input
  */
 
-// Import THREE.js
-import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.132.2/build/three.module.js';
-
-// Import scene variables
+// Import modules
 import { camera, renderer, floorY } from './scene.js';
+import { THREE } from './three-module.js';
 
 // Key state tracking
 const keys = {

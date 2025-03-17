@@ -3,14 +3,10 @@
  * Handles player creation, movement and updates
  */
 
-// Import THREE.js
-import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.132.2/build/three.module.js';
-
-// Import scene variables
-import { scene, camera, renderer, floorY, updateCameraPosition } from './scene.js';
-
-// Import input module
+// Import modules
+import { scene, camera, floorY } from './scene.js';
 import { keys } from './input.js';
+import { THREE } from './three-module.js';
 
 // Player variables
 let playerMesh = null;
@@ -100,7 +96,12 @@ function updatePlayer() {
     });
     
     // Update camera position to follow player
-    updateCameraPosition(playerMesh);
+    if (playerMesh) {
+        const targetPosition = playerMesh.position;
+        const offset = new THREE.Vector3(0, 21, 1);
+        camera.position.copy(targetPosition).add(offset);
+        camera.lookAt(targetPosition.clone().add(new THREE.Vector3(0, 0, 0)));
+    }
     
     // Update name sprite rotation to always face camera
     const nameContainer = playerMesh.children.find(child => 

@@ -79,12 +79,10 @@ function initSocket() {
     });
 
     socket.on('playerMoved', data => {
-        console.log('Player moved:', data.id);
         updatePlayerPosition(data, socket.id);
     });
     
     socket.on('playerRotated', data => {
-        console.log('Player rotated:', data.id);
         updatePlayerRotation(data, socket.id);
     });
         

@@ -3,6 +3,9 @@
  * Handles all Three.js scene, camera and renderer setup and management
  */
 
+// Import THREE.js from centralized module
+import { THREE } from './three-module.js';
+
 // Import cursor module
 import { applyCustomCursor } from './cursor.js';
 
